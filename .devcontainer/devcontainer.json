@@ -1,0 +1,4 @@
+{
+    "name": "Markdown Wiki Development",
+    "postStartCommand": "bash /workspaces/nextcloud-docker-dev/start-dev.sh"
+}
