@@ -29,7 +29,7 @@
 
             <div v-if="selectedPath" class="file-tree">
                 <div class="tree-header">
-                    Files
+                    <span>Explorer</span>
                 </div>
 
                 <p
@@ -68,15 +68,32 @@
                                     currentPath === item.path &&
                                     !selectedFile,
                             }"
-                            :style="{ paddingLeft: `${8 + item.depth * 18}px` }"
+                            :style="{
+                                paddingLeft: `${6 + item.depth * 18}px`,
+                            }"
                             @click="toggleFolder(item.path)"
                         >
                             <span class="tree-chevron">
-                                {{ expandedFolders.has(item.path) ? '▾' : '▸' }}
+                                {{
+                                    expandedFolders.has(item.path)
+                                        ? '⌄'
+                                        : '›'
+                                }}
                             </span>
 
-                            <span class="tree-icon">
-                                📁
+                            <span class="tree-icon tree-folder-icon">
+                                <svg
+                                    viewBox="0 0 24 24"
+                                    aria-hidden="true"
+                                >
+                                    <path
+                                        d="M3 6.5A2.5 2.5 0 0 1 5.5 4H10l2 2h6.5A2.5 2.5 0 0 1 21 8.5v9a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5z"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        stroke-width="1.8"
+                                        stroke-linejoin="round"
+                                    />
+                                </svg>
                             </span>
 
                             <span
@@ -95,11 +112,39 @@
                                 'tree-button-active':
                                     selectedFile?.path === item.path,
                             }"
-                            :style="{ paddingLeft: `${8 + item.depth * 18 + 18}px` }"
+                            :style="{
+                                paddingLeft:
+                                    `${6 + item.depth * 18 + 18}px`,
+                            }"
                             @click="openFile(item.path)"
                         >
-                            <span class="tree-icon">
-                                📄
+                            <span class="tree-icon tree-file-icon">
+                                <svg
+                                    viewBox="0 0 24 24"
+                                    aria-hidden="true"
+                                >
+                                    <path
+                                        d="M6 3.5h8l4 4v13H6z"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        stroke-width="1.8"
+                                        stroke-linejoin="round"
+                                    />
+                                    <path
+                                        d="M14 3.5v4h4"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        stroke-width="1.8"
+                                        stroke-linejoin="round"
+                                    />
+                                    <path
+                                        d="M9 12h6M9 15.5h6"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        stroke-width="1.5"
+                                        stroke-linecap="round"
+                                    />
+                                </svg>
                             </span>
 
                             <span
@@ -173,7 +218,25 @@
 
                 <div class="empty-state">
                     <div class="empty-state-icon">
-                        📄
+                        <svg
+                            viewBox="0 0 24 24"
+                            aria-hidden="true"
+                        >
+                            <path
+                                d="M6 3.5h8l4 4v13H6z"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="1.8"
+                                stroke-linejoin="round"
+                            />
+                            <path
+                                d="M14 3.5v4h4"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="1.8"
+                                stroke-linejoin="round"
+                            />
+                        </svg>
                     </div>
 
                     <h2>No document selected</h2>
@@ -685,13 +748,16 @@ onMounted(async () => {
 
 .wiki-root-title {
     margin-bottom: 4px;
-    font-size: 13px;
-    font-weight: 600;
+    color: var(--color-text-maxcontrast);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
 }
 
 .wiki-root-path {
     overflow: hidden;
-    color: var(--color-text-maxcontrast);
+    color: var(--color-main-text);
     font-size: 12px;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -705,14 +771,18 @@ onMounted(async () => {
     flex: 1;
     min-height: 0;
     overflow-y: auto;
-    padding: 8px;
+    padding: 8px 6px;
 }
 
 .tree-header {
-    padding: 4px 8px 8px;
+    display: flex;
+    align-items: center;
+    min-height: 30px;
+    padding: 4px 8px;
     color: var(--color-text-maxcontrast);
-    font-size: 12px;
-    font-weight: 600;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
     text-transform: uppercase;
 }
 
@@ -736,10 +806,10 @@ onMounted(async () => {
     display: flex;
     align-items: center;
     width: 100%;
-    min-height: 34px;
-    padding-top: 6px;
+    min-height: 32px;
+    padding-top: 4px;
     padding-right: 8px;
-    padding-bottom: 6px;
+    padding-bottom: 4px;
     border: 0;
     border-radius: var(--border-radius-element);
     background: transparent;
@@ -747,6 +817,9 @@ onMounted(async () => {
     cursor: pointer;
     font: inherit;
     text-align: left;
+    transition:
+        background-color 80ms ease,
+        color 80ms ease;
 }
 
 .tree-button:hover {
@@ -755,6 +828,7 @@ onMounted(async () => {
 
 .tree-button-active {
     background: var(--color-primary-element-light);
+    color: var(--color-main-text);
     font-weight: 600;
 }
 
@@ -764,16 +838,38 @@ onMounted(async () => {
 }
 
 .tree-chevron {
+    display: flex;
+    align-items: center;
+    justify-content: center;
     flex: 0 0 auto;
     width: 18px;
+    height: 22px;
     color: var(--color-text-maxcontrast);
-    font-size: 13px;
-    text-align: center;
+    font-size: 18px;
+    line-height: 1;
 }
 
 .tree-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
     flex: 0 0 auto;
     width: 24px;
+    height: 22px;
+    margin-right: 2px;
+}
+
+.tree-icon svg {
+    width: 17px;
+    height: 17px;
+}
+
+.tree-folder-icon {
+    color: var(--color-primary-element);
+}
+
+.tree-file-icon {
+    color: var(--color-text-maxcontrast);
 }
 
 .tree-name {
@@ -866,7 +962,15 @@ onMounted(async () => {
 }
 
 .empty-state-icon {
-    font-size: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.empty-state-icon svg {
+    width: 42px;
+    height: 42px;
+    color: var(--color-text-maxcontrast);
 }
 
 .error-message {
