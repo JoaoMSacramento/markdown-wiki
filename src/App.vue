@@ -4,177 +4,207 @@
             <div class="sidebar-header">
                 <h1>Markdown Wiki</h1>
 
-```
-            <NcButton
-                type="tertiary"
-                :disabled="loadingRoot"
-                @click="selectWikiRoot"
-            >
-                {{ loadingRoot ? 'Loading...' : 'Change Wiki Root' }}
-            </NcButton>
-        </div>
-
-        <div v-if="selectedPath" class="wiki-root">
-            <div class="wiki-root-title">
-                Wiki Root
-            </div>
-
-            <div class="wiki-root-path" :title="selectedPath">
-                {{ selectedPath }}
-            </div>
-        </div>
-
-        <div v-if="errorMessage" class="error-message sidebar-error">
-            {{ errorMessage }}
-        </div>
-
-        <div v-if="selectedPath" class="file-tree">
-            <div class="tree-header">
-                Files
-            </div>
-
-            <p v-if="loadingFiles" class="tree-status">
-                Loading...
-            </p>
-
-            <p v-else-if="filesError" class="error-message tree-status">
-                {{ filesError }}
-            </p>
-
-            <p v-else-if="items.length === 0" class="tree-status">
-                No Markdown files or folders found.
-            </p>
-
-            <ul v-else class="tree-list">
-                <li
-                    v-for="item in items"
-                    :key="item.type + ':' + item.path"
-                    class="tree-item"
-                >
-                    <button
-                        v-if="item.type === 'folder'"
-                        type="button"
-                        class="tree-button"
-                        @click="openFolder(item.path)"
-                    >
-                        <span class="tree-icon">📁</span>
-                        <span class="tree-name">{{ item.name }}</span>
-                    </button>
-
-                    <button
-                        v-else
-                        type="button"
-                        class="tree-button"
-                        :class="{
-                            'tree-button-active':
-                                selectedFile?.path === item.path,
-                        }"
-                        @click="openFile(item.path)"
-                    >
-                        <span class="tree-icon">📄</span>
-                        <span class="tree-name">{{ item.name }}</span>
-                    </button>
-                </li>
-            </ul>
-        </div>
-    </aside>
-
-    <main class="wiki-main">
-        <template v-if="selectedFile">
-            <header class="document-header">
-                <div class="document-navigation">
-                    <NcButton
-                        type="tertiary"
-                        :disabled="loadingFile"
-                        @click="closeFile"
-                    >
-                        ← Back
-                    </NcButton>
-                </div>
-
-                <div class="document-title">
-                    <h2>{{ selectedFile.name }}</h2>
-                    <div class="document-path">
-                        {{ selectedFile.path }}
-                    </div>
-                </div>
-            </header>
-
-            <div v-if="loadingFile" class="document-status">
-                Loading...
-            </div>
-
-            <div
-                v-else-if="fileError"
-                class="error-message document-status"
-            >
-                {{ fileError }}
-            </div>
-
-            <article
-                v-else
-                class="markdown-content"
-                v-html="renderedMarkdown"
-                @click="handleMarkdownClick"
-            ></article>
-        </template>
-
-        <template v-else-if="selectedPath">
-            <header class="folder-header">
-                <div>
-                    <div class="folder-title">
-                        {{ currentPath }}
-                    </div>
-
-                    <div class="folder-subtitle">
-                        Select a Markdown file from the sidebar.
-                    </div>
-                </div>
-
                 <NcButton
-                    v-if="currentPath !== selectedPath"
                     type="tertiary"
-                    :disabled="loadingFiles"
-                    @click="goBack"
+                    :disabled="loadingRoot"
+                    @click="selectWikiRoot"
                 >
-                    ← Parent folder
+                    {{ loadingRoot ? 'Loading...' : 'Change Wiki Root' }}
                 </NcButton>
-            </header>
+            </div>
 
-            <div class="empty-state">
-                <div class="empty-state-icon">📄</div>
+            <div v-if="selectedPath" class="wiki-root">
+                <div class="wiki-root-title">
+                    Wiki Root
+                </div>
 
-                <h2>No document selected</h2>
+                <div class="wiki-root-path" :title="selectedPath">
+                    {{ selectedPath }}
+                </div>
+            </div>
+
+            <div v-if="errorMessage" class="error-message sidebar-error">
+                {{ errorMessage }}
+            </div>
+
+            <div v-if="selectedPath" class="file-tree">
+                <div class="tree-header">
+                    Files
+                </div>
+
+                <p
+                    v-if="treeLoading[selectedPath]"
+                    class="tree-status"
+                >
+                    Loading...
+                </p>
+
+                <p
+                    v-else-if="treeErrors[selectedPath]"
+                    class="error-message tree-status"
+                >
+                    {{ treeErrors[selectedPath] }}
+                </p>
+
+                <p
+                    v-else-if="visibleTreeItems.length === 0"
+                    class="tree-status"
+                >
+                    No Markdown files or folders found.
+                </p>
+
+                <ul v-else class="tree-list">
+                    <li
+                        v-for="item in visibleTreeItems"
+                        :key="item.type + ':' + item.path"
+                        class="tree-item"
+                    >
+                        <button
+                            v-if="item.type === 'folder'"
+                            type="button"
+                            class="tree-button"
+                            :class="{
+                                'tree-button-folder-active':
+                                    currentPath === item.path &&
+                                    !selectedFile,
+                            }"
+                            :style="{ paddingLeft: `${8 + item.depth * 18}px` }"
+                            @click="toggleFolder(item.path)"
+                        >
+                            <span class="tree-chevron">
+                                {{ expandedFolders.has(item.path) ? '▾' : '▸' }}
+                            </span>
+
+                            <span class="tree-icon">
+                                📁
+                            </span>
+
+                            <span
+                                class="tree-name"
+                                :title="item.name"
+                            >
+                                {{ item.name }}
+                            </span>
+                        </button>
+
+                        <button
+                            v-else
+                            type="button"
+                            class="tree-button"
+                            :class="{
+                                'tree-button-active':
+                                    selectedFile?.path === item.path,
+                            }"
+                            :style="{ paddingLeft: `${8 + item.depth * 18 + 18}px` }"
+                            @click="openFile(item.path)"
+                        >
+                            <span class="tree-icon">
+                                📄
+                            </span>
+
+                            <span
+                                class="tree-name"
+                                :title="item.name"
+                            >
+                                {{ item.name }}
+                            </span>
+                        </button>
+                    </li>
+                </ul>
+            </div>
+        </aside>
+
+        <main class="wiki-main">
+            <template v-if="selectedFile">
+                <header class="document-header">
+                    <div class="document-navigation">
+                        <NcButton
+                            type="tertiary"
+                            :disabled="loadingFile"
+                            @click="closeFile"
+                        >
+                            ← Back
+                        </NcButton>
+                    </div>
+
+                    <div class="document-title">
+                        <h2>{{ selectedFile.name }}</h2>
+
+                        <div class="document-path">
+                            {{ selectedFile.path }}
+                        </div>
+                    </div>
+                </header>
+
+                <div
+                    v-if="loadingFile"
+                    class="document-status"
+                >
+                    Loading...
+                </div>
+
+                <div
+                    v-else-if="fileError"
+                    class="error-message document-status"
+                >
+                    {{ fileError }}
+                </div>
+
+                <article
+                    v-else
+                    class="markdown-content"
+                    v-html="renderedMarkdown"
+                    @click="handleMarkdownClick"
+                ></article>
+            </template>
+
+            <template v-else-if="selectedPath">
+                <header class="folder-header">
+                    <div>
+                        <div class="folder-title">
+                            {{ currentPath }}
+                        </div>
+
+                        <div class="folder-subtitle">
+                            Select a Markdown file from the sidebar.
+                        </div>
+                    </div>
+                </header>
+
+                <div class="empty-state">
+                    <div class="empty-state-icon">
+                        📄
+                    </div>
+
+                    <h2>No document selected</h2>
+
+                    <p>
+                        Select a Markdown file from the sidebar to open it.
+                    </p>
+                </div>
+            </template>
+
+            <div v-else class="empty-state">
+                <h2>Markdown Wiki</h2>
 
                 <p>
-                    Select a Markdown file from the sidebar to open it.
+                    Select a Wiki Root folder to get started.
                 </p>
+
+                <NcButton
+                    type="primary"
+                    :disabled="loadingRoot"
+                    @click="selectWikiRoot"
+                >
+                    {{ loadingRoot ? 'Loading...' : 'Select Wiki Root' }}
+                </NcButton>
             </div>
-        </template>
-
-        <div v-else class="empty-state">
-            <h2>Markdown Wiki</h2>
-
-            <p>
-                Select a Wiki Root folder to get started.
-            </p>
-
-            <NcButton
-                type="primary"
-                :disabled="loadingRoot"
-                @click="selectWikiRoot"
-            >
-                {{ loadingRoot ? 'Loading...' : 'Select Wiki Root' }}
-            </NcButton>
-        </div>
-    </main>
-</div>
-```
-
+        </main>
+    </div>
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { getFilePickerBuilder } from '@nextcloud/dialogs'
 import { NcButton } from '@nextcloud/vue'
 import { marked } from 'marked'
@@ -182,24 +212,55 @@ import DOMPurify from 'dompurify'
 
 const selectedPath = ref('')
 const currentPath = ref('')
-const items = ref([])
 
 const selectedFile = ref(null)
 const fileContent = ref('')
 
 const loadingRoot = ref(false)
-const loadingFiles = ref(false)
 const loadingFile = ref(false)
 
 const errorMessage = ref('')
-const filesError = ref('')
 const fileError = ref('')
+
+const treeChildren = reactive({})
+const treeLoading = reactive({})
+const treeErrors = reactive({})
+
+const expandedFolders = ref(new Set())
 
 const renderedMarkdown = computed(() => {
     const markdown = fileContent.value || ''
     const html = marked.parse(markdown)
 
     return DOMPurify.sanitize(html)
+})
+
+const visibleTreeItems = computed(() => {
+    const result = []
+
+    function addChildren(path, depth) {
+        const children = treeChildren[path] || []
+
+        for (const item of children) {
+            result.push({
+                ...item,
+                depth,
+            })
+
+            if (
+                item.type === 'folder' &&
+                expandedFolders.value.has(item.path)
+            ) {
+                addChildren(item.path, depth + 1)
+            }
+        }
+    }
+
+    if (selectedPath.value) {
+        addChildren(selectedPath.value, 0)
+    }
+
+    return result
 })
 
 function getRequestHeaders() {
@@ -214,12 +275,6 @@ function normalizeNextcloudPath(path) {
     }
 
     return '/' + path.replace(/^\/+|\/+$/g, '')
-}
-
-function normalizeRelativePath(path) {
-    return path
-        .replace(/^\/+/, '')
-        .replace(/\/+$/, '')
 }
 
 function getCurrentDirectory(filePath) {
@@ -304,7 +359,6 @@ function handleMarkdownClick(event) {
     }
 
     const href = target.getAttribute('href')
-
     const resolvedPath = resolveMarkdownLink(href)
 
     if (!resolvedPath) {
@@ -335,7 +389,6 @@ async function loadWikiRoot() {
         const data = await response.json()
 
         selectedPath.value = normalizeNextcloudPath(data.wikiRoot)
-
         currentPath.value = selectedPath.value
     } catch (error) {
         console.error(error)
@@ -346,17 +399,29 @@ async function loadWikiRoot() {
     }
 }
 
-async function loadFiles(path = selectedPath.value) {
-    if (!selectedPath.value) {
+async function loadTreeFolder(path, force = false) {
+    const normalizedPath = normalizeNextcloudPath(path)
+
+    if (!normalizedPath) {
         return
     }
 
-    loadingFiles.value = true
-    filesError.value = ''
+    if (
+        !force &&
+        Object.prototype.hasOwnProperty.call(
+            treeChildren,
+            normalizedPath,
+        )
+    ) {
+        return
+    }
+
+    treeLoading[normalizedPath] = true
+    delete treeErrors[normalizedPath]
 
     try {
         const params = new URLSearchParams({
-            path,
+            path: normalizedPath,
         })
 
         const response = await fetch(
@@ -376,24 +441,42 @@ async function loadFiles(path = selectedPath.value) {
 
         const data = await response.json()
 
-        items.value = data.items || []
+        treeChildren[normalizedPath] = data.items || []
         currentPath.value = normalizeNextcloudPath(data.path)
     } catch (error) {
         console.error(error)
 
-        filesError.value = error.message || 'Unable to load files.'
-        items.value = []
+        treeErrors[normalizedPath] =
+            error.message || 'Unable to load files.'
     } finally {
-        loadingFiles.value = false
+        treeLoading[normalizedPath] = false
     }
 }
 
-async function openFolder(path) {
-    selectedFile.value = null
-    fileContent.value = ''
-    fileError.value = ''
+async function toggleFolder(path) {
+    const normalizedPath = normalizeNextcloudPath(path)
 
-    await loadFiles(path)
+    if (expandedFolders.value.has(normalizedPath)) {
+        const next = new Set(expandedFolders.value)
+        next.delete(normalizedPath)
+        expandedFolders.value = next
+
+        currentPath.value = normalizedPath
+
+        return
+    }
+
+    await loadTreeFolder(normalizedPath)
+
+    if (treeErrors[normalizedPath]) {
+        return
+    }
+
+    const next = new Set(expandedFolders.value)
+    next.add(normalizedPath)
+    expandedFolders.value = next
+
+    currentPath.value = normalizedPath
 }
 
 async function openFile(path) {
@@ -451,20 +534,20 @@ function closeFile() {
     fileError.value = ''
 }
 
-async function goBack() {
-    if (currentPath.value === selectedPath.value) {
-        return
+function clearTree() {
+    for (const key of Object.keys(treeChildren)) {
+        delete treeChildren[key]
     }
 
-    const normalized = normalizeNextcloudPath(currentPath.value)
-    const lastSlash = normalized.lastIndexOf('/')
+    for (const key of Object.keys(treeLoading)) {
+        delete treeLoading[key]
+    }
 
-    const parentPath =
-        lastSlash > 0
-            ? normalized.substring(0, lastSlash)
-            : selectedPath.value
+    for (const key of Object.keys(treeErrors)) {
+        delete treeErrors[key]
+    }
 
-    await loadFiles(parentPath)
+    expandedFolders.value = new Set()
 }
 
 async function saveWikiRoot(path) {
@@ -503,7 +586,9 @@ async function saveWikiRoot(path) {
         fileContent.value = ''
         fileError.value = ''
 
-        await loadFiles(selectedPath.value)
+        clearTree()
+
+        await loadTreeFolder(selectedPath.value)
     } catch (error) {
         console.error(error)
 
@@ -552,7 +637,7 @@ onMounted(async () => {
     await loadWikiRoot()
 
     if (selectedPath.value) {
-        await loadFiles(selectedPath.value)
+        await loadTreeFolder(selectedPath.value)
     }
 })
 </script>
@@ -651,8 +736,10 @@ onMounted(async () => {
     display: flex;
     align-items: center;
     width: 100%;
-    min-height: 36px;
-    padding: 6px 8px;
+    min-height: 34px;
+    padding-top: 6px;
+    padding-right: 8px;
+    padding-bottom: 6px;
     border: 0;
     border-radius: var(--border-radius-element);
     background: transparent;
@@ -671,12 +758,26 @@ onMounted(async () => {
     font-weight: 600;
 }
 
+.tree-button-folder-active {
+    background: var(--color-background-hover);
+    font-weight: 600;
+}
+
+.tree-chevron {
+    flex: 0 0 auto;
+    width: 18px;
+    color: var(--color-text-maxcontrast);
+    font-size: 13px;
+    text-align: center;
+}
+
 .tree-icon {
     flex: 0 0 auto;
     width: 24px;
 }
 
 .tree-name {
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -771,12 +872,6 @@ onMounted(async () => {
 .error-message {
     color: var(--color-error);
 }
-
-/*
- * Markdown HTML is injected with v-html.
- * :deep() is required because these elements are
- * dynamically inserted into the DOM.
- */
 
 .markdown-content {
     max-width: 900px;
