@@ -253,19 +253,38 @@ function resolveMarkdownLink(href) {
         return null
     }
 
+    const normalizedRoot = normalizeNextcloudPath(selectedPath.value)
     const baseDirectory = getCurrentDirectory(selectedFile.value.path)
 
-    let resolvedPath
+    let pathToResolve
 
     if (cleanHref.startsWith('/')) {
-        resolvedPath = normalizeNextcloudPath(cleanHref)
+        pathToResolve = cleanHref
     } else {
-        resolvedPath = normalizeNextcloudPath(
-            `${baseDirectory}/${cleanHref}`,
-        )
+        pathToResolve = `${baseDirectory}/${cleanHref}`
     }
 
-    const normalizedRoot = normalizeNextcloudPath(selectedPath.value)
+    const segments = pathToResolve.split('/')
+    const resolvedSegments = []
+
+    for (const segment of segments) {
+        if (!segment || segment === '.') {
+            continue
+        }
+
+        if (segment === '..') {
+            if (resolvedSegments.length === 0) {
+                return null
+            }
+
+            resolvedSegments.pop()
+            continue
+        }
+
+        resolvedSegments.push(segment)
+    }
+
+    const resolvedPath = '/' + resolvedSegments.join('/')
 
     if (
         resolvedPath !== normalizedRoot &&
