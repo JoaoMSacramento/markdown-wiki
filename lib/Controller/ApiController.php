@@ -6,6 +6,7 @@ namespace OCA\MarkdownWiki\Controller;
 
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
+use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\DataResponse;
 use OCP\Files\File;
 use OCP\Files\Folder;
@@ -26,6 +27,7 @@ class ApiController extends Controller
         parent::__construct($appName, $request);
     }
 
+    #[NoCSRFRequired]
     #[NoAdminRequired]
     public function getWikiRoot(): DataResponse
     {
@@ -47,6 +49,7 @@ class ApiController extends Controller
         ]);
     }
 
+    #[NoCSRFRequired]
     #[NoAdminRequired]
     public function setWikiRoot(string $wikiRoot): DataResponse
     {
@@ -73,6 +76,7 @@ class ApiController extends Controller
         ]);
     }
 
+    #[NoCSRFRequired]
     #[NoAdminRequired]
     public function listFiles(string $path = ''): DataResponse
     {
@@ -211,6 +215,7 @@ class ApiController extends Controller
         ]);
     }
 
+    #[NoCSRFRequired]
     #[NoAdminRequired]
     public function getFile(string $path): DataResponse
     {

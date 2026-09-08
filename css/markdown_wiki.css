@@ -1,0 +1,565 @@
+.markdown-wiki {
+    display: flex;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    background: var(--color-main-background);
+}
+
+/*
+ * Nextcloud application layout
+ *
+ * Keep #content controlled by Nextcloud so that the
+ * global header remains outside the application.
+ */
+
+#content.app-markdown_wiki {
+    width: 100% !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    min-height: calc(100% - var(--header-height)) !important;
+    padding-top: var(--header-height) !important;
+    box-sizing: border-box !important;
+}
+
+#content.app-markdown_wiki #app-content {
+    width: 100% !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    min-height: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-sizing: border-box !important;
+}
+
+#content.app-markdown_wiki #app-content-wrapper {
+    width: 100% !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    min-height: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-sizing: border-box !important;
+}
+
+#content.app-markdown_wiki #markdown-wiki-app {
+    width: 100% !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    height: 100% !important;
+    box-sizing: border-box !important;
+}
+
+
+/*
+ * Sidebar
+ */
+
+.wiki-sidebar {
+    display: flex;
+    flex-direction: column;
+    flex: 0 0 280px;
+    width: 280px;
+    min-width: 220px;
+    max-width: 360px;
+    height: 100%;
+    min-height: 0;
+    border-right: 1px solid var(--color-border);
+    background: var(--color-background-dark);
+}
+
+.sidebar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.sidebar-header h1 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.wiki-root {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.wiki-root-title {
+    margin-bottom: 4px;
+    color: var(--color-text-maxcontrast);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.wiki-root-path {
+    overflow: hidden;
+    color: var(--color-main-text);
+    font-size: 12px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sidebar-error {
+    margin: 8px 12px;
+}
+
+.file-tree {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding: 8px 6px;
+}
+
+.tree-header {
+    display: flex;
+    align-items: center;
+    min-height: 30px;
+    padding: 4px 8px;
+    color: var(--color-text-maxcontrast);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.tree-status {
+    padding: 8px;
+    color: var(--color-text-maxcontrast);
+    font-size: 13px;
+}
+
+.tree-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.tree-item {
+    margin: 1px 0;
+}
+
+.tree-button {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-height: 32px;
+    padding: 4px 8px;
+    border: 0 !important;
+    border-radius: var(--border-radius-element);
+    outline: none;
+    background: transparent !important;
+    box-shadow: none !important;
+    color: var(--color-main-text);
+    cursor: pointer;
+    font: inherit;
+    text-align: left;
+    appearance: none;
+    transition:
+        background-color 80ms ease,
+        color 80ms ease;
+}
+
+.tree-button:hover {
+    background: var(--color-background-hover) !important;
+}
+
+.tree-button-active {
+    background: var(--color-primary-element-light) !important;
+    color: var(--color-main-text);
+    font-weight: 600;
+}
+
+.tree-button-folder-active {
+    background: var(--color-background-hover) !important;
+    font-weight: 600;
+}
+
+.tree-chevron {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    width: 18px;
+    height: 22px;
+    color: var(--color-text-maxcontrast);
+    font-size: 18px;
+    line-height: 1;
+}
+
+.tree-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    width: 24px;
+    height: 22px;
+    margin-right: 2px;
+}
+
+.tree-icon svg {
+    width: 17px;
+    height: 17px;
+}
+
+.tree-folder-icon {
+    color: var(--color-primary-element);
+}
+
+.tree-file-icon {
+    color: var(--color-text-maxcontrast);
+}
+
+.tree-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+
+/*
+ * Main document area
+ */
+
+.wiki-main {
+    display: block;
+    flex: 1 1 0;
+    width: auto;
+    min-width: 0;
+    min-height: 0;
+    height: 100%;
+    overflow-x: hidden;
+    overflow-y: auto;
+    box-sizing: border-box;
+    background: var(--color-main-background);
+}
+
+
+/*
+ * Document header
+ */
+
+.document-header {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 16px 32px 12px;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.document-top {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    min-width: 0;
+}
+
+.document-navigation {
+    flex: 0 0 auto;
+}
+
+.document-title {
+    min-width: 0;
+}
+
+.document-title h2 {
+    margin: 0;
+    overflow: hidden;
+    font-size: 20px;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.breadcrumbs {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0;
+    margin-top: 10px;
+    font-size: 13px;
+}
+
+.breadcrumb-button {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 0;
+    border: 0;
+    background: transparent !important;
+    color: var(--color-text-maxcontrast);
+    cursor: pointer;
+    font: inherit;
+}
+
+.breadcrumb-button:not(:disabled):hover {
+    background: transparent !important;
+    color: var(--color-main-text);
+    text-decoration: underline;
+}
+
+.breadcrumb-button:disabled {
+    cursor: default;
+}
+
+.breadcrumb-current {
+    color: var(--color-main-text);
+    font-weight: 600;
+}
+
+.breadcrumb-separator {
+    margin: 0 7px;
+    color: var(--color-text-maxcontrast);
+}
+
+.document-path {
+    margin-top: 5px;
+    overflow: hidden;
+    color: var(--color-text-maxcontrast);
+    font-size: 12px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.document-status {
+    padding: 24px 32px;
+}
+
+.document-footer {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    width: 100%;
+    max-width: 1100px;
+    box-sizing: border-box;
+    margin: 0 auto;
+    padding: 16px 48px 40px;
+    border-top: 1px solid var(--color-border);
+}
+
+.document-footer button {
+    max-width: 45%;
+}
+
+
+/*
+ * Folder view
+ */
+
+.folder-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 16px 32px;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.folder-title {
+    font-size: 20px;
+    font-weight: 600;
+}
+
+.folder-subtitle {
+    margin-top: 4px;
+    color: var(--color-text-maxcontrast);
+    font-size: 13px;
+}
+
+
+/*
+ * Empty state
+ */
+
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 400px;
+    padding: 40px;
+    text-align: center;
+}
+
+.empty-state h2 {
+    margin: 12px 0 4px;
+}
+
+.empty-state p {
+    margin: 0 0 20px;
+    color: var(--color-text-maxcontrast);
+}
+
+.empty-state-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.empty-state-icon svg {
+    width: 42px;
+    height: 42px;
+    color: var(--color-text-maxcontrast);
+}
+
+.error-message {
+    color: var(--color-error);
+}
+
+
+/*
+ * Markdown content
+ */
+
+.wiki-markdown-content {
+    width: 100%;
+    max-width: 1100px;
+    box-sizing: border-box;
+    margin: 0 auto;
+    padding: 32px 48px 64px;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    line-height: 1.6;
+}
+
+.wiki-markdown-content h1,
+.wiki-markdown-content h2,
+.wiki-markdown-content h3,
+.wiki-markdown-content h4,
+.wiki-markdown-content h5,
+.wiki-markdown-content h6 {
+    scroll-margin-top: 24px;
+    margin-top: 1.5em;
+    margin-bottom: 0.6em;
+    line-height: 1.3;
+}
+
+.wiki-markdown-content h1 {
+    font-size: 2em;
+}
+
+.wiki-markdown-content h2 {
+    font-size: 1.6em;
+}
+
+.wiki-markdown-content h3 {
+    font-size: 1.35em;
+}
+
+.wiki-markdown-content h4 {
+    font-size: 1.15em;
+}
+
+.wiki-markdown-content h5,
+.wiki-markdown-content h6 {
+    font-size: 1em;
+}
+
+.wiki-markdown-content strong {
+    font-weight: 700;
+}
+
+.wiki-markdown-content em {
+    font-style: italic;
+}
+
+.wiki-markdown-content del {
+    text-decoration: line-through;
+}
+
+.wiki-markdown-content p {
+    margin: 0.8em 0;
+}
+
+.wiki-markdown-content a {
+    text-decoration: underline;
+}
+
+.wiki-markdown-content ul,
+.wiki-markdown-content ol {
+    margin: 0.8em 0;
+    padding-left: 2em;
+}
+
+.wiki-markdown-content li {
+    margin: 0.25em 0;
+}
+
+.wiki-markdown-content blockquote {
+    margin: 1em 0;
+    padding: 0.5em 1em;
+    border-left: 4px solid var(--color-border-dark);
+}
+
+.wiki-markdown-content blockquote p {
+    margin: 0.4em 0;
+}
+
+.wiki-markdown-content table {
+    width: 100%;
+    max-width: 100%;
+    margin: 1em 0;
+    border-collapse: collapse;
+}
+
+.wiki-markdown-content th,
+.wiki-markdown-content td {
+    padding: 8px 12px;
+    border: 1px solid var(--color-border);
+    text-align: left;
+    vertical-align: top;
+}
+
+.wiki-markdown-content th {
+    font-weight: 700;
+}
+
+.wiki-markdown-content hr {
+    margin: 1.5em 0;
+    border: 0;
+    border-top: 1px solid var(--color-border);
+}
+
+.wiki-markdown-content code {
+    padding: 0.15em 0.35em;
+    border-radius: 4px;
+    background: var(--color-background-dark);
+    font-family: monospace;
+    font-size: 0.9em;
+}
+
+.wiki-markdown-content pre {
+    max-width: 100%;
+    margin: 1em 0;
+    padding: 12px 16px;
+    overflow-x: auto;
+    border-radius: 6px;
+    background: var(--color-background-dark);
+}
+
+.wiki-markdown-content pre code {
+    padding: 0;
+    background: transparent;
+    white-space: pre;
+}
+
+.wiki-markdown-content img {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    margin: 1em 0;
+}
+
+.wiki-markdown-content iframe,
+.wiki-markdown-content video,
+.wiki-markdown-content object,
+.wiki-markdown-content embed {
+    max-width: 100%;
+}
