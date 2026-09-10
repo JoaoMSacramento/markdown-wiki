@@ -29,5 +29,10 @@ return [
             'url' => '/api/file',
             'verb' => 'GET',
         ],
+        [
+            'name' => 'api#saveFile',
+            'url' => '/api/save-file',
+            'verb' => 'POST',
+        ],
     ],
 ];

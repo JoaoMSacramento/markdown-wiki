@@ -58,10 +58,56 @@ class ApiController extends Controller
         if ($user === null) {
             return new DataResponse([
                 'success' => false,
+                'message' => 'Not authenticated.',
             ], 401);
         }
 
         $wikiRoot = '/' . trim($wikiRoot, '/');
+
+        if ($wikiRoot === '/') {
+            return new DataResponse([
+                'success' => false,
+                'message' => 'Wiki Root cannot be the root of your Files.',
+            ], 400);
+        }
+
+        /*
+         * Prevent path traversal and invalid relative paths.
+         */
+        if (
+            str_contains($wikiRoot, '/../') ||
+            str_ends_with($wikiRoot, '/..') ||
+            str_starts_with($wikiRoot, '../') ||
+            str_contains($wikiRoot, '/./') ||
+            str_ends_with($wikiRoot, '/.')
+        ) {
+            return new DataResponse([
+                'success' => false,
+                'message' => 'Invalid Wiki Root path.',
+            ], 400);
+        }
+
+        $userFolder = $this->rootFolder->getUserFolder(
+            $user->getUID(),
+        );
+
+        $relativePath = ltrim($wikiRoot, '/');
+
+        try {
+            $folder = $userFolder->get($relativePath);
+        } catch (\OCP\Files\NotFoundException) {
+            return new DataResponse([
+                'success' => false,
+                'message' => 'The selected folder was not found.',
+            ], 404);
+        }
+
+        if (!$folder instanceof Folder) {
+            return new DataResponse([
+                'success' => false,
+                'message' => 'The selected Wiki Root is not a folder.',
+            ], 400);
+        }
 
         $this->config->setUserValue(
             $user->getUID(),
@@ -78,8 +124,10 @@ class ApiController extends Controller
 
     #[NoCSRFRequired]
     #[NoAdminRequired]
-    public function listFiles(string $path = ''): DataResponse
-    {
+    public function listFiles(
+        string $path = '',
+        bool $showAll = false,
+    ): DataResponse {
         $user = $this->userSession->getUser();
 
         if ($user === null) {
@@ -113,6 +161,9 @@ class ApiController extends Controller
 
         $normalizedPath = '/' . trim($requestedPath, '/');
 
+        /*
+         * Prevent access outside the configured Wiki Root.
+         */
         if (
             $normalizedPath !== $normalizedRoot
             && !str_starts_with(
@@ -184,19 +235,93 @@ class ApiController extends Controller
                 continue;
             }
 
-            if ($node instanceof File) {
-                if (strtolower($node->getExtension()) !== 'md') {
-                    continue;
-                }
-
-                $items[] = [
-                    'name' => $node->getName(),
-                    'type' => 'file',
-                    'path' => $relativeNodePath,
-                ];
+            if (!$node instanceof File) {
+                continue;
             }
+
+            $extension = strtolower(
+                $node->getExtension(),
+            );
+
+            /*
+             * In the default Markdown mode we only expose
+             * Markdown files.
+             */
+            if (
+                !$showAll &&
+                $extension !== 'md'
+            ) {
+                continue;
+            }
+
+            $fileType = match ($extension) {
+                'md', 'markdown' => 'markdown',
+
+                'png',
+                'jpg',
+                'jpeg',
+                'gif',
+                'webp',
+                'svg',
+                'bmp',
+                'ico',
+                'avif' => 'image',
+
+                'pdf' => 'pdf',
+
+                'txt',
+                'log',
+                'csv' => 'text',
+
+                'json',
+                'xml',
+                'yaml',
+                'yml',
+                'toml',
+                'ini',
+                'conf' => 'code',
+
+                'js',
+                'jsx',
+                'ts',
+                'tsx',
+                'vue',
+                'css',
+                'scss',
+                'html',
+                'php',
+                'py',
+                'java',
+                'c',
+                'cpp',
+                'h',
+                'hpp',
+                'sh',
+                'bash',
+                'zsh' => 'code',
+
+                'zip',
+                'tar',
+                'gz',
+                '7z',
+                'rar' => 'archive',
+
+                default => 'file',
+            };
+
+            $items[] = [
+                'name' => $node->getName(),
+                'type' => 'file',
+                'fileType' => $fileType,
+                'extension' => $extension,
+                'path' => $relativeNodePath,
+            ];
         }
 
+        /*
+         * Folders always come first.
+         * Files are sorted alphabetically.
+         */
         usort(
             $items,
             static function (array $a, array $b): int {
@@ -204,13 +329,17 @@ class ApiController extends Controller
                     return $a['type'] === 'folder' ? -1 : 1;
                 }
 
-                return strcasecmp($a['name'], $b['name']);
-            }
+                return strcasecmp(
+                    $a['name'],
+                    $b['name'],
+                );
+            },
         );
 
         return new DataResponse([
             'success' => true,
             'path' => $normalizedPath,
+            'showAll' => $showAll,
             'items' => $items,
         ]);
     }
@@ -260,7 +389,10 @@ class ApiController extends Controller
 
         if (
             strtolower(
-                pathinfo($normalizedPath, PATHINFO_EXTENSION)
+                pathinfo(
+                    $normalizedPath,
+                    PATHINFO_EXTENSION,
+                ),
             ) !== 'md'
         ) {
             return new DataResponse([
@@ -296,6 +428,131 @@ class ApiController extends Controller
             'name' => $file->getName(),
             'path' => $normalizedPath,
             'content' => $file->getContent(),
+        ]);
+    }
+
+    #[NoCSRFRequired]
+    #[NoAdminRequired]
+    public function saveFile(
+        string $path,
+        string $content = '',
+    ): DataResponse {
+        $user = $this->userSession->getUser();
+
+        if ($user === null) {
+            return new DataResponse([
+                'success' => false,
+                'message' => 'Not authenticated.',
+            ], 401);
+        }
+
+        $wikiRoot = $this->config->getUserValue(
+            $user->getUID(),
+            $this->appName,
+            'wiki_root',
+            '',
+        );
+
+        if ($wikiRoot === '') {
+            return new DataResponse([
+                'success' => false,
+                'message' => 'Wiki Root is not configured.',
+            ], 400);
+        }
+
+        $normalizedRoot = '/' . trim($wikiRoot, '/');
+        $normalizedPath = '/' . trim($path, '/');
+
+        /*
+         * Reject invalid paths before accessing the filesystem.
+         */
+        if (
+            $normalizedPath === '/'
+            || str_contains($normalizedPath, '/../')
+            || str_ends_with($normalizedPath, '/..')
+            || str_starts_with($normalizedPath, '../')
+            || str_contains($normalizedPath, '/./')
+            || str_ends_with($normalizedPath, '/.')
+        ) {
+            return new DataResponse([
+                'success' => false,
+                'message' => 'Invalid file path.',
+            ], 400);
+        }
+
+        /*
+         * The file must remain inside the configured Wiki Root.
+         */
+        if (
+            $normalizedPath !== $normalizedRoot
+            && !str_starts_with(
+                $normalizedPath,
+                $normalizedRoot . '/',
+            )
+        ) {
+            return new DataResponse([
+                'success' => false,
+                'message' => 'File is outside Wiki Root.',
+            ], 403);
+        }
+
+        /*
+         * Only Markdown files can currently be edited.
+         */
+        if (
+            strtolower(
+                pathinfo(
+                    $normalizedPath,
+                    PATHINFO_EXTENSION,
+                ),
+            ) !== 'md'
+        ) {
+            return new DataResponse([
+                'success' => false,
+                'message' => 'Only Markdown files can be edited.',
+            ], 400);
+        }
+
+        $userFolder = $this->rootFolder->getUserFolder(
+            $user->getUID(),
+        );
+
+        $relativePath = ltrim(
+            $normalizedPath,
+            '/',
+        );
+
+        try {
+            $file = $userFolder->get(
+                $relativePath,
+            );
+        } catch (\OCP\Files\NotFoundException) {
+            return new DataResponse([
+                'success' => false,
+                'message' => 'File was not found.',
+            ], 404);
+        }
+
+        if (!$file instanceof File) {
+            return new DataResponse([
+                'success' => false,
+                'message' => 'Path is not a file.',
+            ], 400);
+        }
+
+        try {
+            $file->putContent($content);
+        } catch (\Throwable $e) {
+            return new DataResponse([
+                'success' => false,
+                'message' => 'Failed to save the Markdown file.',
+            ], 500);
+        }
+
+        return new DataResponse([
+            'success' => true,
+            'name' => $file->getName(),
+            'path' => $normalizedPath,
         ]);
     }
 }
