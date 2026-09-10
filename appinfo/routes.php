@@ -34,5 +34,10 @@ return [
             'url' => '/api/save-file',
             'verb' => 'POST',
         ],
+        [
+            'name' => 'api#search',
+            'url' => '/api/search',
+            'verb' => 'GET',
+        ],
     ],
 ];

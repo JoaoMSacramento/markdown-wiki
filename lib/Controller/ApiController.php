@@ -555,4 +555,204 @@ class ApiController extends Controller
             'path' => $normalizedPath,
         ]);
     }
+
+    #[NoCSRFRequired]
+    #[NoAdminRequired]
+    public function search(): DataResponse
+    {
+        $query = trim(
+            $this->request->getParam('query', ''),
+        );
+
+        $user = $this->userSession->getUser();
+
+        if ($user === null) {
+            return new DataResponse([
+                'success' => false,
+                'message' => 'Not authenticated.',
+                'results' => [],
+            ], 401);
+        }
+
+        if ($query === '') {
+            return new DataResponse([
+                'success' => true,
+                'results' => [],
+            ]);
+        }
+
+        $wikiRoot = $this->config->getUserValue(
+            $user->getUID(),
+            $this->appName,
+            'wiki_root',
+            '',
+        );
+
+        if ($wikiRoot === '') {
+            return new DataResponse([
+                'success' => false,
+                'message' => 'Wiki Root is not configured.',
+                'results' => [],
+            ], 400);
+        }
+
+        $normalizedRoot = '/' . trim($wikiRoot, '/');
+
+        $userFolder = $this->rootFolder->getUserFolder(
+            $user->getUID(),
+        );
+
+        $relativeRoot = ltrim($normalizedRoot, '/');
+
+        try {
+            $rootFolder = $userFolder->get($relativeRoot);
+        } catch (\OCP\Files\NotFoundException) {
+            return new DataResponse([
+                'success' => false,
+                'message' => 'Wiki Root was not found.',
+                'results' => [],
+            ], 404);
+        }
+
+        if (!$rootFolder instanceof Folder) {
+            return new DataResponse([
+                'success' => false,
+                'message' => 'Wiki Root is not a folder.',
+                'results' => [],
+            ], 400);
+        }
+
+        $queryLower = mb_strtolower($query);
+        $results = [];
+
+        $this->searchFolder(
+            $rootFolder,
+            $userFolder,
+            $queryLower,
+            $results,
+        );
+
+        /*
+         * Keep the response bounded so a broad query cannot
+         * generate an unnecessarily large response.
+         */
+        $results = array_slice($results, 0, 100);
+
+        return new DataResponse([
+            'success' => true,
+            'query' => $query,
+            'results' => $results,
+        ]);
+    }
+
+    private function searchFolder(
+        Folder $folder,
+        Folder $userFolder,
+        string $query,
+        array &$results,
+    ): void {
+        foreach ($folder->getDirectoryListing() as $node) {
+            if (count($results) >= 100) {
+                return;
+            }
+
+            if ($node instanceof Folder) {
+                $this->searchFolder(
+                    $node,
+                    $userFolder,
+                    $query,
+                    $results,
+                );
+
+                continue;
+            }
+
+            if (!$node instanceof File) {
+                continue;
+            }
+
+            if (
+                strtolower(
+                    $node->getExtension(),
+                ) !== 'md'
+            ) {
+                continue;
+            }
+
+            $nodeName = $node->getName();
+            $nameMatch = mb_stripos(
+                $nodeName,
+                $query,
+            ) !== false;
+
+            $content = '';
+
+            if (!$nameMatch) {
+                $content = $node->getContent();
+
+                if (
+                    mb_stripos(
+                        $content,
+                        $query,
+                    ) === false
+                ) {
+                    continue;
+                }
+            }
+
+            $nodePath = $node->getPath();
+            $userFolderPath = $userFolder->getPath();
+
+            $relativeNodePath = '/' . ltrim(
+                substr(
+                    $nodePath,
+                    strlen($userFolderPath),
+                ),
+                '/',
+            );
+
+            $matchType = $nameMatch
+                ? 'name'
+                : 'content';
+
+            $context = '';
+
+            if (!$nameMatch) {
+                $position = mb_stripos(
+                    $content,
+                    $query,
+                );
+
+                if ($position !== false) {
+                    $start = max(
+                        0,
+                        $position - 80,
+                    );
+
+                    $context = mb_substr(
+                        $content,
+                        $start,
+                        180,
+                    );
+
+                    if ($start > 0) {
+                        $context = '…' . $context;
+                    }
+
+                    if (
+                        $start + 180 < mb_strlen($content)
+                    ) {
+                        $context .= '…';
+                    }
+                }
+            }
+
+            $results[] = [
+                'name' => $nodeName,
+                'path' => $relativeNodePath,
+                'matchType' => $matchType,
+                'context' => $context,
+            ];
+        }
+    }
 }

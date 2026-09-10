@@ -249,7 +249,6 @@
 .tree-view-toggle {
 	display: inline-flex;
 	align-items: center;
-	flex: 0 0 auto;
 	padding: 2px;
 	border: 1px solid var(--color-border);
 	border-radius: 7px;
@@ -895,14 +894,17 @@
 }
 
 .markdown-content strong {
+	color: var(--color-main-text);
 	font-weight: 700;
 }
 
 .markdown-content em {
+	color: var(--color-main-text) !important;
 	font-style: italic;
 }
 
 .markdown-content del {
+	color: var(--color-main-text);
 	text-decoration: line-through;
 }
 
@@ -923,14 +925,28 @@
 	color: var(--color-primary-element-text);
 }
 
-.markdown-content ul,
+/*
+ * Normal Markdown lists
+ */
+
+.markdown-content ul {
+	list-style-type: disc !important;
+	list-style-position: outside;
+	margin: 0 0 1em;
+	padding-left: 2em;
+}
+
 .markdown-content ol {
+	list-style-type: decimal !important;
+	list-style-position: outside;
 	margin: 0 0 1em;
 	padding-left: 2em;
 }
 
 .markdown-content li {
+	display: list-item;
 	margin: 0.3em 0;
+	padding: 0;
 }
 
 .markdown-content li > ul,
@@ -939,12 +955,145 @@
 	margin-bottom: 0;
 }
 
+/*
+ * Task / checklist lists
+ */
+
+.markdown-content ul:has(> li > input[type='checkbox']) {
+	display: block !important;
+	list-style: none !important;
+	list-style-type: none !important;
+	list-style-position: outside !important;
+	margin: 0 0 1em !important;
+	padding-left: 1em !important;
+}
+
+.markdown-content ul:has(> li > input[type='checkbox']) > li {
+	display: flex !important;
+	align-items: flex-start !important;
+	width: 100%;
+	box-sizing: border-box;
+	list-style: none !important;
+	list-style-type: none !important;
+	list-style-position: outside !important;
+	margin: 0.3em 0 !important;
+	padding: 0 !important;
+}
+
+.markdown-content ul:has(> li > input[type='checkbox']) > li::marker,
+.markdown-content ul:has(> li > input[type='checkbox']) > li::before,
+.markdown-content ul:has(> li > input[type='checkbox']) > li::after {
+	display: none !important;
+	content: none !important;
+}
+
+.markdown-content ul:has(> li > input[type='checkbox']) > li > input[type='checkbox'] {
+	display: block !important;
+	flex: 0 0 16px !important;
+	width: 16px !important;
+	height: 16px !important;
+	min-width: 16px !important;
+	min-height: 16px !important;
+	margin: 0.34em 8px 0 0 !important;
+	padding: 0 !important;
+	border: 0 !important;
+	outline: none !important;
+	appearance: auto !important;
+	-webkit-appearance: checkbox !important;
+}
+
+.markdown-content ul:has(> li > input[type='checkbox']) > li > p {
+	flex: 1 1 auto;
+	min-width: 0;
+	margin: 0 !important;
+	padding: 0 !important;
+}
+
+.markdown-content ul:has(> li > input[type='checkbox']) > li > input[type='checkbox'] + * {
+	min-width: 0;
+}
+
+.markdown-content ul:has(> li > input[type='checkbox']) > li > input[type='checkbox']:disabled {
+	opacity: 1 !important;
+	cursor: default;
+}
+
+.markdown-content ul:has(> li > input[type='checkbox']) > li > input[type='checkbox']:checked {
+	accent-color: var(--color-primary-element);
+}
+
+/*
+ * Fallback for browsers / CSS environments where :has()
+ * is not available but Marked provides the task-list class.
+ */
+
+.markdown-content ul.contains-task-list {
+	display: block !important;
+	list-style: none !important;
+	list-style-type: none !important;
+	list-style-position: outside !important;
+	margin: 0 0 1em !important;
+	padding: 0 !important;
+}
+
+.markdown-content ul.contains-task-list > li {
+	display: flex !important;
+	align-items: flex-start !important;
+	list-style: none !important;
+	list-style-type: none !important;
+	list-style-position: outside !important;
+	margin: 0.3em 0 !important;
+	padding: 0 !important;
+}
+
+.markdown-content ul.contains-task-list > li::marker,
+.markdown-content ul.contains-task-list > li::before,
+.markdown-content ul.contains-task-list > li::after {
+	display: none !important;
+	content: none !important;
+}
+
+.markdown-content ul.contains-task-list > li > input[type='checkbox'] {
+	display: block !important;
+	flex: 0 0 16px !important;
+	width: 16px !important;
+	height: 16px !important;
+	min-width: 16px !important;
+	min-height: 16px !important;
+	margin: 0.34em 8px 0 0 !important;
+	padding: 0 !important;
+	border: 0 !important;
+	outline: none !important;
+	appearance: auto !important;
+	-webkit-appearance: checkbox !important;
+}
+
+.markdown-content ul.contains-task-list > li > input[type='checkbox'] + p {
+	flex: 1 1 auto;
+	min-width: 0;
+	margin: 0 !important;
+	padding: 0 !important;
+}
+
+.markdown-content ul.contains-task-list > li > input[type='checkbox'] + * {
+	min-width: 0;
+}
+
+.markdown-content ul.contains-task-list > li > input[type='checkbox']:disabled {
+	opacity: 1 !important;
+	cursor: default;
+}
+
+.markdown-content ul.contains-task-list > li > input[type='checkbox']:checked {
+	accent-color: var(--color-primary-element);
+}
+
 .markdown-content blockquote {
 	margin: 1.25em 0;
 	padding: 8px 16px;
 	border-left: 3px solid var(--color-primary-element);
 	background: var(--color-background-hover);
-	color: var(--color-text-maxcontrast);
+	color: var(--color-main-text);
 }
 
 .markdown-content blockquote p {
@@ -1273,10 +1422,47 @@
 }
 
 /*
+ * Code language selector
+ */
+
+.markdown-editor-toolbar-select {
+	display: inline-flex;
+	align-items: center;
+	height: 32px;
+	min-width: 130px;
+	max-width: 170px;
+	padding: 0 28px 0 9px;
+	box-sizing: border-box;
+	border: 1px solid var(--color-border);
+	border-radius: var(--border-radius-element);
+	background-color: var(--color-main-background);
+	background-image: none;
+	color: var(--color-main-text);
+	cursor: pointer;
+	font: inherit;
+	font-size: 12px;
+	font-weight: 600;
+	line-height: 1;
+	appearance: auto;
+}
+
+.markdown-editor-toolbar-select:hover {
+	border-color: var(--color-border-dark);
+	background-color: var(--color-background-hover);
+}
+
+.markdown-editor-toolbar-select:focus {
+	outline: 2px solid var(--color-primary-element);
+	outline-offset: 1px;
+}
+
+.markdown-editor-toolbar-select option {
+	background: var(--color-main-background);
+	color: var(--color-main-text);
+}
+
+/*
  * Split editor
- *
- * The toolbar sits above the complete split workspace,
- * so it is shared by the source and preview panes.
  */
 
 .editor-split {
@@ -1426,8 +1612,6 @@
 
 /*
  * Responsive
- *
- * Split editor deliberately remains side-by-side.
  */
 
 @media (max-width: 800px) {
@@ -1466,6 +1650,12 @@
 		padding-left: 7px;
 	}
 
+	.markdown-editor-toolbar-select {
+		min-width: 115px;
+		max-width: 150px;
+		height: 30px;
+	}
+
 	.editor-split {
 		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 		gap: 10px;
@@ -1473,5 +1663,203 @@
 
 	.editor-preview-panel {
 		padding-left: 10px;
+	}
+}
+
+/*
+ * Wiki search
+ */
+
+.wiki-search {
+	flex: 0 0 auto;
+	padding: 10px 12px;
+	border-bottom: 1px solid var(--color-border);
+	background: var(--color-background-hover);
+}
+
+.wiki-search-input-wrapper {
+	position: relative;
+	display: flex;
+	align-items: center;
+	width: 100%;
+	min-width: 0;
+}
+
+.wiki-search-icon {
+	position: absolute;
+	top: 50%;
+	left: 10px;
+	z-index: 2;
+	width: 16px;
+	height: 16px;
+	transform: translateY(-50%);
+	color: var(--color-text-maxcontrast);
+	pointer-events: none;
+}
+
+.wiki-search-input {
+	display: block;
+	width: 100%;
+	min-width: 0;
+	min-height: 34px;
+	margin: 0;
+	padding: 6px 34px 6px 36px !important;
+	box-sizing: border-box;
+	border: 1px solid var(--color-border);
+	border-radius: 7px;
+	background: var(--color-main-background);
+	color: var(--color-main-text);
+	font: inherit;
+	font-size: 13px;
+	line-height: 1.3;
+	appearance: none;
+}
+
+.wiki-search-input::placeholder {
+	color: var(--color-text-maxcontrast);
+}
+
+.wiki-search-input:hover {
+	border-color: var(--color-border-dark);
+}
+
+.wiki-search-input:focus {
+	outline: 2px solid var(--color-primary-element);
+	outline-offset: -1px;
+}
+
+.wiki-search-input::-webkit-search-cancel-button {
+	display: none;
+}
+
+.wiki-search-clear {
+	position: absolute;
+	top: 50%;
+	right: 6px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 24px;
+	height: 24px;
+	padding: 0;
+	transform: translateY(-50%);
+	border: 0 !important;
+	border-radius: 5px;
+	background: transparent !important;
+	color: var(--color-text-maxcontrast);
+	cursor: pointer;
+	font: inherit;
+	font-size: 20px;
+	font-weight: 400;
+	line-height: 1;
+	appearance: none;
+}
+
+.wiki-search-clear:hover {
+	background: var(--color-background-hover) !important;
+	color: var(--color-main-text);
+}
+
+.wiki-search-clear:focus-visible {
+	outline: 2px solid var(--color-primary-element);
+	outline-offset: -1px;
+}
+
+/*
+ * Search results
+ */
+
+.wiki-search-results {
+	max-height: 420px;
+	margin-top: 8px;
+	overflow-x: hidden;
+	overflow-y: auto;
+	border: 1px solid var(--color-border);
+	border-radius: 7px;
+	background: var(--color-main-background);
+	scrollbar-width: thin;
+}
+
+.wiki-search-status {
+	padding: 12px;
+	color: var(--color-text-maxcontrast);
+	font-size: 12px;
+	line-height: 1.4;
+}
+
+.wiki-search-error {
+	color: var(--color-error);
+}
+
+.wiki-search-result {
+	display: flex;
+	flex-direction: column;
+	width: 100%;
+	min-width: 0;
+	padding: 9px 10px;
+	box-sizing: border-box;
+	border: 0 !important;
+	border-bottom: 1px solid var(--color-border) !important;
+	border-radius: 0;
+	background: transparent !important;
+	box-shadow: none !important;
+	color: var(--color-main-text);
+	cursor: pointer;
+	font: inherit;
+	text-align: left;
+	appearance: none;
+}
+
+.wiki-search-result:last-child {
+	border-bottom: 0 !important;
+}
+
+.wiki-search-result:hover {
+	background: var(--color-background-hover) !important;
+}
+
+.wiki-search-result:focus-visible {
+	position: relative;
+	z-index: 1;
+	outline: 2px solid var(--color-primary-element);
+	outline-offset: -2px;
+}
+
+.wiki-search-result-name {
+	min-width: 0;
+	overflow: hidden;
+	color: var(--color-main-text);
+	font-size: 13px;
+	font-weight: 600;
+	line-height: 1.35;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.wiki-search-result-path {
+	min-width: 0;
+	margin-top: 2px;
+	overflow: hidden;
+	color: var(--color-text-maxcontrast);
+	font-size: 11px;
+	line-height: 1.35;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.wiki-search-result-context {
+	display: -webkit-box;
+	margin-top: 5px;
+	overflow: hidden;
+	color: var(--color-text-maxcontrast);
+	font-size: 11px;
+	line-height: 1.45;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 3;
+}
+
+@media (max-width: 800px) {
+	.wiki-search-results {
+		max-height: 300px;
 	}
 }

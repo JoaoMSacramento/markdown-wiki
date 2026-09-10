@@ -5,6 +5,104 @@
                 <h1>Markdown Wiki</h1>
             </div>
 
+            <div class="wiki-search">
+                <div class="wiki-search-input-wrapper">
+                    <svg
+                        class="wiki-search-icon"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        aria-hidden="true"
+                    >
+                        <circle
+                            cx="11"
+                            cy="11"
+                            r="7"
+                        />
+                        <path
+                            d="m20 20-4-4"
+                        />
+                    </svg>
+
+                    <input
+                        v-model="searchQuery"
+                        type="search"
+                        class="wiki-search-input"
+                        placeholder="Search..."
+                        aria-label="Search Wiki"
+                        @keydown.escape="clearSearch"
+                    />
+
+                    <button
+                        v-if="searchQuery"
+                        type="button"
+                        class="wiki-search-clear"
+                        aria-label="Clear search"
+                        title="Clear search"
+                        @click="clearSearch"
+                    >
+                        ×
+                    </button>
+                </div>
+
+                <div
+                    v-if="searchQuery"
+                    class="wiki-search-results"
+                >
+                    <div
+                        v-if="searchLoading"
+                        class="wiki-search-status"
+                    >
+                        Searching...
+                    </div>
+
+                    <div
+                        v-else-if="searchError"
+                        class="wiki-search-status wiki-search-error"
+                    >
+                        {{ searchError }}
+                    </div>
+
+                    <div
+                        v-else-if="searchResults.length === 0"
+                        class="wiki-search-status"
+                    >
+                        No results found.
+                    </div>
+
+                    <button
+                        v-for="result in searchResults"
+                        v-else
+                        :key="result.path"
+                        type="button"
+                        class="wiki-search-result"
+                        :title="result.path"
+                        @click="openSearchResult(result)"
+                    >
+                        <span class="wiki-search-result-name">
+                            {{ result.name }}
+                        </span>
+
+                        <span class="wiki-search-result-path">
+                            {{ getSearchResultDirectory(result.path) }}
+                        </span>
+
+                        <span
+                            v-if="
+                                result.matchType === 'content' &&
+                                result.context
+                            "
+                            class="wiki-search-result-context"
+                        >
+                            {{ result.context }}
+                        </span>
+                    </button>
+                </div>
+            </div>
+
             <div class="wiki-root">
                 <div class="wiki-root-title">
                     Wiki Root
@@ -48,7 +146,10 @@
                 </button>
             </div>
 
-            <div v-if="error" class="sidebar-error">
+            <div
+                v-if="error"
+                class="sidebar-error"
+            >
                 <p class="error-message">
                     {{ error }}
                 </p>
@@ -364,13 +465,6 @@
                         </div>
 
                         <template v-else-if="editing">
-                            <!--
-                             * Markdown formatting toolbar.
-                             *
-                             * The toolbar is intentionally hidden in
-                             * Preview mode because there is no editable
-                             * source in that mode.
-                             -->
                             <div
                                 v-if="
                                     editorMode !==
@@ -489,9 +583,7 @@
                                         aria-label="Bullet list"
                                         @mousedown.prevent
                                         @click="
-                                            applyLinePrefix(
-                                                '- ',
-                                            )
+                                            applyBulletList()
                                         "
                                     >
                                         • List
@@ -517,9 +609,7 @@
                                         aria-label="Checklist"
                                         @mousedown.prevent
                                         @click="
-                                            applyLinePrefix(
-                                                '- [ ] ',
-                                            )
+                                            applyChecklist()
                                         "
                                     >
                                         ☑ List
@@ -532,9 +622,7 @@
                                         aria-label="Blockquote"
                                         @mousedown.prevent
                                         @click="
-                                            applyLinePrefix(
-                                                '> ',
-                                            )
+                                            applyBlockquote()
                                         "
                                     >
                                         Quote
@@ -589,6 +677,22 @@
                                     >
                                         &lt;/&gt;
                                     </button>
+
+                                    <select
+                                        v-model="selectedCodeLanguage"
+                                        class="markdown-toolbar-code-language"
+                                        title="Code block language"
+                                        aria-label="Code block language"
+                                        @mousedown.stop
+                                    >
+                                        <option
+                                            v-for="language in codeLanguages"
+                                            :key="language.value"
+                                            :value="language.value"
+                                        >
+                                            {{ language.label }}
+                                        </option>
+                                    </select>
 
                                     <button
                                         type="button"
@@ -728,9 +832,11 @@
                     </h2>
 
                     <p class="resource-type">
-                        {{ getFileTypeLabel(
-                            selectedResource.fileType,
-                        ) }}
+                        {{
+                            getFileTypeLabel(
+                                selectedResource.fileType,
+                            )
+                        }}
                     </p>
 
                     <div class="resource-path">
@@ -739,9 +845,11 @@
                         </span>
 
                         <code>
-                            {{ getResourceRelativePath(
-                                selectedResource.path,
-                            ) }}
+                            {{
+                                getResourceRelativePath(
+                                    selectedResource.path,
+                                )
+                            }}
                         </code>
                     </div>
 
@@ -810,6 +918,7 @@ import {
     onBeforeUnmount,
     onMounted,
     ref,
+    watch,
 } from 'vue'
 
 import { marked } from 'marked'
@@ -854,11 +963,94 @@ const editorMode = ref('split')
 const editorTextarea = ref(null)
 
 /*
+ * Search state.
+ */
+const searchQuery = ref('')
+const searchResults = ref([])
+const searchLoading = ref(false)
+const searchError = ref('')
+
+let searchTimeout = null
+let searchRequestId = 0
+
+/*
+ * Code block language.
+ */
+const selectedCodeLanguage = ref('')
+
+const codeLanguages = [
+    {
+        value: '',
+        label: 'Plain text',
+    },
+    {
+        value: 'bash',
+        label: 'Bash',
+    },
+    {
+        value: 'c',
+        label: 'C',
+    },
+    {
+        value: 'cpp',
+        label: 'C++',
+    },
+    {
+        value: 'csharp',
+        label: 'C#',
+    },
+    {
+        value: 'css',
+        label: 'CSS',
+    },
+    {
+        value: 'go',
+        label: 'Go',
+    },
+    {
+        value: 'html',
+        label: 'HTML',
+    },
+    {
+        value: 'java',
+        label: 'Java',
+    },
+    {
+        value: 'javascript',
+        label: 'JavaScript',
+    },
+    {
+        value: 'json',
+        label: 'JSON',
+    },
+    {
+        value: 'markdown',
+        label: 'Markdown',
+    },
+    {
+        value: 'php',
+        label: 'PHP',
+    },
+    {
+        value: 'python',
+        label: 'Python',
+    },
+    {
+        value: 'rust',
+        label: 'Rust',
+    },
+    {
+        value: 'sql',
+        label: 'SQL',
+    },
+    {
+        value: 'typescript',
+        label: 'TypeScript',
+    },
+]
+
+/*
  * File tree mode.
- *
- * Markdown is the default mode.
- * All files asks the API to return every file
- * inside the Wiki Root.
  */
 const treeMode = ref('markdown')
 
@@ -1275,6 +1467,160 @@ async function toggleFolder(node) {
 }
 
 /*
+ * Search.
+ */
+function scheduleSearch() {
+    if (searchTimeout !== null) {
+        window.clearTimeout(searchTimeout)
+        searchTimeout = null
+    }
+
+    if (!searchQuery.value.trim()) {
+        searchResults.value = []
+        searchLoading.value = false
+        searchError.value = ''
+        return
+    }
+
+    searchLoading.value = true
+
+    searchTimeout = window.setTimeout(() => {
+        searchTimeout = null
+        searchWiki()
+    }, 250)
+}
+
+async function searchWiki() {
+    const query = searchQuery.value.trim()
+
+    if (!query) {
+        searchResults.value = []
+        searchLoading.value = false
+        searchError.value = ''
+        return
+    }
+
+    if (!wikiRoot.value) {
+        searchResults.value = []
+        searchLoading.value = false
+        searchError.value =
+            'Wiki Root is not configured.'
+        return
+    }
+
+    const requestId = ++searchRequestId
+
+    searchLoading.value = true
+    searchError.value = ''
+
+    try {
+        const url = new URL(
+            OC.generateUrl(
+                '/apps/markdown_wiki/api/search',
+            ),
+            window.location.origin,
+        )
+
+        url.searchParams.set(
+            'query',
+            query,
+        )
+
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                Accept: 'application/json',
+            },
+        })
+
+        const data = await response.json()
+
+        if (!response.ok) {
+            throw new Error(
+                data.message ||
+                    'Failed to search Wiki.',
+            )
+        }
+
+        if (requestId !== searchRequestId) {
+            return
+        }
+
+        searchResults.value =
+            Array.isArray(data.results)
+                ? data.results
+                : []
+    } catch (err) {
+        if (requestId !== searchRequestId) {
+            return
+        }
+
+        searchResults.value = []
+        searchError.value =
+            err.message ||
+            'Failed to search Wiki.'
+    } finally {
+        if (requestId === searchRequestId) {
+            searchLoading.value = false
+        }
+    }
+}
+
+function clearSearch() {
+    if (searchTimeout !== null) {
+        window.clearTimeout(searchTimeout)
+        searchTimeout = null
+    }
+
+    searchRequestId++
+
+    searchQuery.value = ''
+    searchResults.value = []
+    searchLoading.value = false
+    searchError.value = ''
+}
+
+async function openSearchResult(result) {
+	if (!result || !result.path) {
+		return
+	}
+
+	clearSearch()
+	await openFile(result.path)
+}
+
+function getSearchResultDirectory(path) {
+    const normalizedPath =
+        normalizePath(path)
+
+    const root =
+        normalizePath(
+            wikiRoot.value,
+        )
+
+    const parent =
+        getParentPath(
+            normalizedPath,
+        )
+
+    if (parent === root) {
+        return '.'
+    }
+
+    if (
+        parent.startsWith(
+            root + '/',
+        )
+    ) {
+        return parent.slice(
+            root.length + 1,
+        )
+    }
+
+    return parent
+}
+
+/*
  * Ask whether it is safe to leave the current
  * document.
  */
@@ -1557,6 +1903,8 @@ async function startEditing() {
     editedMarkdown.value =
         markdown.value
 
+    selectedCodeLanguage.value = ''
+
     editorMode.value = 'split'
     editing.value = true
 
@@ -1574,6 +1922,7 @@ function stopEditing() {
     editing.value = false
     editedMarkdown.value = markdown.value
     saveError.value = ''
+    selectedCodeLanguage.value = ''
 }
 
 /*
@@ -1609,7 +1958,7 @@ function getEditorElement() {
 
 /*
  * Replace text in the editor while preserving
- * the cursor/selection as closely as possible.
+ * the cursor/selection.
  */
 function replaceEditorText(
     start,
@@ -1658,14 +2007,7 @@ function replaceEditorText(
 }
 
 /*
- * Apply inline Markdown formatting.
- *
- * With a selection:
- *     text -> **text**
- *
- * Without a selection:
- *     -> ****
- *        cursor is placed between the markers.
+ * Apply or remove inline Markdown formatting.
  */
 function applyInlineFormatting(
     prefix,
@@ -1679,52 +2021,102 @@ function applyInlineFormatting(
 
     const start = textarea.selectionStart
     const end = textarea.selectionEnd
+    const value = editedMarkdown.value
+
     const selectedText =
-        editedMarkdown.value.slice(
+        value.slice(start, end)
+
+    /*
+     * If the selected text is already wrapped
+     * by the requested formatting, remove it.
+     */
+    if (
+        selectedText.length >=
+            prefix.length +
+                suffix.length &&
+        selectedText.startsWith(prefix) &&
+        selectedText.endsWith(suffix)
+    ) {
+        const unformatted =
+            selectedText.slice(
+                prefix.length,
+                selectedText.length -
+                    suffix.length,
+            )
+
+        replaceEditorText(
             start,
             end,
+            unformatted,
+            start,
+            start + unformatted.length,
         )
 
+        return
+    }
+
+    /*
+     * No selection.
+     */
+    if (!selectedText) {
+        const placeholder =
+            prefix === '**'
+                ? 'bold text'
+                : prefix === '*'
+                    ? 'italic text'
+                    : prefix === '~~'
+                        ? 'strikethrough text'
+                        : 'code'
+
+        const replacement =
+            prefix +
+            placeholder +
+            suffix
+
+        const placeholderStart =
+            start + prefix.length
+
+        const placeholderEnd =
+            placeholderStart +
+            placeholder.length
+
+        replaceEditorText(
+            start,
+            end,
+            replacement,
+            placeholderStart,
+            placeholderEnd,
+        )
+
+        return
+    }
+
+    /*
+     * Normal selection.
+     */
     const replacement =
         prefix +
         selectedText +
         suffix
 
-    const cursorPosition =
-        selectedText
-            ? start + replacement.length
-            : start + prefix.length
-
-    const selectionStart =
-        selectedText
-            ? cursorPosition
-            : cursorPosition
-
-    const selectionEnd =
-        selectedText
-            ? cursorPosition
-            : cursorPosition
-
     replaceEditorText(
         start,
         end,
         replacement,
-        selectionStart,
-        selectionEnd,
+        start,
+        start + replacement.length,
     )
 }
 
 /*
- * Apply a Markdown prefix to every selected line.
- *
- * With no selection, the prefix is inserted
- * at the current line.
+ * Get the beginning and end of the lines
+ * affected by the current selection.
  */
-function applyLinePrefix(prefix) {
+function getSelectedLineRange() {
     const textarea = getEditorElement()
 
     if (!textarea) {
-        return
+        return null
     }
 
     const value = editedMarkdown.value
@@ -1747,109 +2139,244 @@ function applyLinePrefix(prefix) {
         lineEnd = value.length
     }
 
-    const selectedLines =
-        value.slice(
+    return {
+        start,
+        end,
+        lineStart,
+        lineEnd,
+        text: value.slice(
             lineStart,
             lineEnd,
-        )
+        ),
+    }
+}
+
+/*
+ * Apply a Markdown heading prefix.
+ */
+function applyLinePrefix(prefix) {
+    const range = getSelectedLineRange()
+
+    if (!range) {
+        return
+    }
 
     const lines =
-        selectedLines.split('\n')
+        range.text.split('\n')
 
     const replacement =
         lines
             .map((line) => {
-                if (
-                    line.startsWith(prefix)
-                ) {
-                    return line.slice(
-                        prefix.length,
+                const content =
+                    line.replace(
+                        /^#{1,6}\s+/,
+                        '',
                     )
+
+                if (!content.trim()) {
+                    return prefix.trimEnd()
                 }
 
-                return prefix + line
+                return prefix + content
             })
             .join('\n')
 
-    const changed =
-        replacement !== selectedLines
-
     replaceEditorText(
-        lineStart,
-        lineEnd,
+        range.lineStart,
+        range.lineEnd,
         replacement,
-        lineStart,
-        lineStart + replacement.length,
+        range.lineStart,
+        range.lineStart +
+            replacement.length,
     )
 }
 
 /*
- * Apply an ordered list while preserving the
- * selected lines.
+ * Apply a bullet list.
  */
-function applyOrderedList() {
-    const textarea = getEditorElement()
+function applyBulletList() {
+    const range = getSelectedLineRange()
 
-    if (!textarea) {
+    if (!range) {
         return
     }
 
-    const value = editedMarkdown.value
-    const start = textarea.selectionStart
-    const end = textarea.selectionEnd
-
-    const lineStart =
-        value.lastIndexOf(
-            '\n',
-            Math.max(0, start - 1),
-        ) + 1
-
-    let lineEnd =
-        value.indexOf(
-            '\n',
-            end,
-        )
-
-    if (lineEnd === -1) {
-        lineEnd = value.length
-    }
-
-    const selectedLines =
-        value.slice(
-            lineStart,
-            lineEnd,
-        )
-
     const lines =
-        selectedLines.split('\n')
+        range.text.split('\n')
 
     const replacement =
         lines
-            .map(
-                (line, index) =>
-                    `${index + 1}. ${line}`,
-            )
+            .map((line) => {
+                const content =
+                    line.replace(
+                        /^\s*(?:[-*+]\s+(?:\[[ xX]\]\s*)?|\d+\.\s+|>\s+)/,
+                        '',
+                    )
+
+                return `- ${content}`
+            })
             .join('\n')
 
     replaceEditorText(
-        lineStart,
-        lineEnd,
+        range.lineStart,
+        range.lineEnd,
         replacement,
-        lineStart,
-        lineStart + replacement.length,
+        range.lineStart,
+        range.lineStart +
+            replacement.length,
+    )
+}
+
+/*
+ * Apply an ordered list.
+ */
+function applyOrderedList() {
+    const range = getSelectedLineRange()
+
+    if (!range) {
+        return
+    }
+
+    const lines =
+        range.text.split('\n')
+
+    const replacement =
+        lines
+            .map((line, index) => {
+                const content =
+                    line.replace(
+                        /^\s*(?:[-*+]\s+(?:\[[ xX]\]\s*)?|\d+\.\s+|>\s+)/,
+                        '',
+                    )
+
+                return `${index + 1}. ${content}`
+            })
+            .join('\n')
+
+    replaceEditorText(
+        range.lineStart,
+        range.lineEnd,
+        replacement,
+        range.lineStart,
+        range.lineStart +
+            replacement.length,
+    )
+}
+
+/*
+ * Apply a checklist.
+ */
+function applyChecklist() {
+    const range = getSelectedLineRange()
+
+    if (!range) {
+        return
+    }
+
+    const lines =
+        range.text.split('\n')
+
+    const hasChecklist =
+        lines.length > 0 &&
+        lines.every((line) =>
+            /^\s*[-*+]\s+\[[ xX]\]\s+/.test(
+                line,
+            ),
+        )
+
+    const replacement =
+        lines
+            .map((line) => {
+                const checklistMatch =
+                    line.match(
+                        /^\s*[-*+]\s+\[([ xX])\]\s*(.*)$/,
+                    )
+
+                if (checklistMatch) {
+                    const checked =
+                        checklistMatch[1]
+                            .toLowerCase() ===
+                        'x'
+
+                    if (hasChecklist) {
+                        return (
+                            checked
+                                ? '- [ ] '
+                                : '- [x] '
+                        ) +
+                            checklistMatch[2]
+                    }
+
+                    return (
+                        `- [${checked ? 'x' : ' '}] ` +
+                        checklistMatch[2]
+                    )
+                }
+
+                const content =
+                    line.replace(
+                        /^\s*(?:[-*+]\s+|\d+\.\s+|>\s+)/,
+                        '',
+                    )
+
+                return `- [ ] ${content}`
+            })
+            .join('\n')
+
+    replaceEditorText(
+        range.lineStart,
+        range.lineEnd,
+        replacement,
+        range.lineStart,
+        range.lineStart +
+            replacement.length,
+    )
+}
+
+/*
+ * Apply a blockquote.
+ */
+function applyBlockquote() {
+    const range = getSelectedLineRange()
+
+    if (!range) {
+        return
+    }
+
+    const lines =
+        range.text.split('\n')
+
+    const allQuoted =
+        lines.every((line) =>
+            /^\s*>\s?/.test(line),
+        )
+
+    const replacement =
+        lines
+            .map((line) => {
+                if (allQuoted) {
+                    return line.replace(
+                        /^\s*>\s?/,
+                        '',
+                    )
+                }
+
+                return `> ${line}`
+            })
+            .join('\n')
+
+    replaceEditorText(
+        range.lineStart,
+        range.lineEnd,
+        replacement,
+        range.lineStart,
+        range.lineStart +
+            replacement.length,
     )
 }
 
 /*
  * Insert a Markdown link.
- *
- * Selected text:
- *     [selected text](https://)
- *
- * No selection:
- *     [link text](https://)
- *     with "link text" selected so it can be
- *     immediately replaced by typing.
  */
 function insertLink() {
     const textarea = getEditorElement()
@@ -1860,6 +2387,7 @@ function insertLink() {
 
     const start = textarea.selectionStart
     const end = textarea.selectionEnd
+
     const selectedText =
         editedMarkdown.value.slice(
             start,
@@ -1889,9 +2417,6 @@ function insertLink() {
 
 /*
  * Insert a Markdown image.
- *
- * The placeholder path can later be replaced
- * with a path from the All files tree.
  */
 function insertImage() {
     const textarea = getEditorElement()
@@ -1902,6 +2427,7 @@ function insertImage() {
 
     const start = textarea.selectionStart
     const end = textarea.selectionEnd
+
     const selectedText =
         editedMarkdown.value.slice(
             start,
@@ -1941,28 +2467,61 @@ function applyCodeBlock() {
 
     const start = textarea.selectionStart
     const end = textarea.selectionEnd
+
     const selectedText =
         editedMarkdown.value.slice(
             start,
             end,
         )
 
-    const replacement =
-        selectedText
-            ? `\`\`\`\n${selectedText}\n\`\`\``
-            : '```\n\n```'
+    const language =
+        selectedCodeLanguage.value
 
-    const cursorStart =
-        selectedText
-            ? start + replacement.length
-            : start + 4
+    const openingFence =
+        language
+            ? `\`\`\`${language}`
+            : '```'
+
+    if (selectedText) {
+        const replacement =
+            `${openingFence}\n` +
+            `${selectedText}\n` +
+            '```'
+
+        replaceEditorText(
+            start,
+            end,
+            replacement,
+            start,
+            start + replacement.length,
+        )
+
+        return
+    }
+
+    const placeholder =
+        'code'
+
+    const replacement =
+        `${openingFence}\n` +
+        `${placeholder}\n` +
+        '```'
+
+    const placeholderStart =
+        start +
+        openingFence.length +
+        1
+
+    const placeholderEnd =
+        placeholderStart +
+        placeholder.length
 
     replaceEditorText(
         start,
         end,
         replacement,
-        cursorStart,
-        cursorStart,
+        placeholderStart,
+        placeholderEnd,
     )
 }
 
@@ -2080,10 +2639,6 @@ function handleEditorKeydown(event) {
 
 /*
  * Save the current Markdown file.
- *
- * The backend endpoint is:
- *
- * POST /apps/markdown_wiki/api/save-file
  */
 async function saveFile() {
     if (
@@ -2136,21 +2691,16 @@ async function saveFile() {
             )
         }
 
-        /*
-         * The new content is now the saved version.
-         */
         markdown.value =
             editedMarkdown.value
 
         editedMarkdown.value =
             markdown.value
 
-        /*
-         * Leave edit mode after a successful save.
-         */
         editing.value = false
 
         saveError.value = ''
+        selectedCodeLanguage.value = ''
     } catch (err) {
         saveError.value =
             err.message ||
@@ -2270,11 +2820,6 @@ function getRelativePath(
  * Get the most useful relative path for a
  * resource selected while editing/reading a
  * Markdown document.
- *
- * When a Markdown file is open, the path is
- * relative to its directory.
- *
- * Otherwise it is relative to the Wiki Root.
  */
 function getResourceCopyPath(path) {
     if (selectedFile.value) {
@@ -2460,10 +3005,6 @@ function resolveMarkdownImages(html) {
             return
         }
 
-        /*
-         * Keep external and embedded images
-         * unchanged.
-         */
         if (
             source.startsWith(
                 'http://',
@@ -2481,19 +3022,12 @@ function resolveMarkdownImages(html) {
             return
         }
 
-        /*
-         * Keep protocol-relative URLs unchanged.
-         */
         if (
             source.startsWith('//')
         ) {
             return
         }
 
-        /*
-         * Separate query string and fragment
-         * before resolving the file path.
-         */
         const match =
             source.match(
                 /^([^?#]*)([?#].*)?$/,
@@ -2509,13 +3043,6 @@ function resolveMarkdownImages(html) {
                 ? match[2]
                 : ''
 
-        /*
-         * Root-relative paths are interpreted
-         * from the configured Wiki Root.
-         *
-         * Relative paths are interpreted from
-         * the current Markdown file.
-         */
         let resolvedPath
 
         if (
@@ -2597,10 +3124,6 @@ function handleMarkdownClick(event) {
         return
     }
 
-    /*
-     * Leave external links, anchors and mail
-     * links to the browser.
-     */
     if (
         href.startsWith('http://') ||
         href.startsWith('https://') ||
@@ -2610,9 +3133,6 @@ function handleMarkdownClick(event) {
         return
     }
 
-    /*
-     * Only intercept relative Markdown files.
-     */
     if (
         !href.toLowerCase().endsWith('.md')
     ) {
@@ -2644,9 +3164,6 @@ function handleMarkdownClick(event) {
 
 /*
  * Render arbitrary Markdown content.
- *
- * This is shared by the normal document view and
- * the live editor preview.
  */
 function renderMarkdown(content) {
     if (!content) {
@@ -2708,10 +3225,6 @@ function renderMarkdown(content) {
             },
         )
 
-    /*
-     * Resolve relative images before sanitizing
-     * the generated HTML.
-     */
     const htmlWithImages =
         resolveMarkdownImages(
             html,
@@ -2807,6 +3320,8 @@ async function chooseWikiRoot() {
         saveError.value = ''
         copyError.value = ''
         copiedResourcePath.value = false
+
+        clearSearch()
 
         expandedFolders.value = new Set()
         tree.value = []
@@ -3414,6 +3929,16 @@ const TreeNode = defineComponent({
     },
 })
 
+/*
+ * Search when the user changes the query.
+ *
+ * The small debounce prevents a request from being
+ * sent for every single keystroke immediately.
+ */
+watch(searchQuery, () => {
+    scheduleSearch()
+})
+
 onMounted(() => {
     loadWikiRoot()
 
@@ -3428,5 +3953,12 @@ onBeforeUnmount(() => {
         'beforeunload',
         handleBeforeUnload,
     )
+
+    if (searchTimeout !== null) {
+        window.clearTimeout(searchTimeout)
+        searchTimeout = null
+    }
+
+    searchRequestId++
 })
 </script>
