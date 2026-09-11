@@ -35,6 +35,16 @@ return [
             'verb' => 'POST',
         ],
         [
+            'name' => 'api#createFile',
+            'url' => '/api/create-file',
+            'verb' => 'POST',
+        ],
+        [
+            'name' => 'api#createFolder',
+            'url' => '/api/create-folder',
+            'verb' => 'POST',
+        ],
+        [
             'name' => 'api#search',
             'url' => '/api/search',
             'verb' => 'GET',

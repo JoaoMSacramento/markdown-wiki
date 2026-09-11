@@ -5,7 +5,10 @@
                 <h1>Markdown Wiki</h1>
             </div>
 
-            <div class="wiki-search">
+            <div
+                ref="searchContainer"
+                class="wiki-search"
+            >
                 <div class="wiki-search-input-wrapper">
                     <svg
                         class="wiki-search-icon"
@@ -33,6 +36,7 @@
                         class="wiki-search-input"
                         placeholder="Search..."
                         aria-label="Search Wiki"
+                        @focus="handleSearchFocus"
                         @keydown.escape="clearSearch"
                     />
 
@@ -49,57 +53,135 @@
                 </div>
 
                 <div
-                    v-if="searchQuery"
+                    v-if="
+                        searchQuery ||
+                        searchHistoryVisible
+                    "
                     class="wiki-search-results"
                 >
-                    <div
-                        v-if="searchLoading"
-                        class="wiki-search-status"
-                    >
-                        Searching...
-                    </div>
-
-                    <div
-                        v-else-if="searchError"
-                        class="wiki-search-status wiki-search-error"
-                    >
-                        {{ searchError }}
-                    </div>
-
-                    <div
-                        v-else-if="searchResults.length === 0"
-                        class="wiki-search-status"
-                    >
-                        No results found.
-                    </div>
-
-                    <button
-                        v-for="result in searchResults"
-                        v-else
-                        :key="result.path"
-                        type="button"
-                        class="wiki-search-result"
-                        :title="result.path"
-                        @click="openSearchResult(result)"
-                    >
-                        <span class="wiki-search-result-name">
-                            {{ result.name }}
-                        </span>
-
-                        <span class="wiki-search-result-path">
-                            {{ getSearchResultDirectory(result.path) }}
-                        </span>
-
-                        <span
-                            v-if="
-                                result.matchType === 'content' &&
-                                result.context
-                            "
-                            class="wiki-search-result-context"
+                    <template v-if="searchQuery">
+                        <div
+                            v-if="searchLoading"
+                            class="wiki-search-status"
                         >
-                            {{ result.context }}
-                        </span>
-                    </button>
+                            Searching...
+                        </div>
+
+                        <div
+                            v-else-if="searchError"
+                            class="wiki-search-status wiki-search-error"
+                        >
+                            {{ searchError }}
+                        </div>
+
+                        <div
+                            v-else-if="searchResults.length === 0"
+                            class="wiki-search-status"
+                        >
+                            No results found.
+                        </div>
+
+                        <button
+                            v-for="result in searchResults"
+                            v-else
+                            :key="result.path"
+                            type="button"
+                            class="wiki-search-result"
+                            :title="result.path"
+                            @click="openSearchResult(result)"
+                        >
+                            <span class="wiki-search-result-name">
+                                {{ result.name }}
+                            </span>
+
+                            <span class="wiki-search-result-path">
+                                {{ getSearchResultDirectory(result.path) }}
+                            </span>
+
+                            <span
+                                v-if="
+                                    result.matchType === 'content' &&
+                                    result.context
+                                "
+                                class="wiki-search-result-context"
+                            >
+                                {{ result.context }}
+                            </span>
+                        </button>
+                    </template>
+
+                    <template v-else-if="searchHistoryVisible">
+                        <div class="wiki-search-history-header">
+                            <span>
+                                Recent searches
+                            </span>
+
+                            <button
+                                v-if="searchHistory.length"
+                                type="button"
+                                class="wiki-search-history-clear"
+                                @click="clearSearchHistory"
+                            >
+                                Clear all
+                            </button>
+                        </div>
+
+                        <div
+                            v-if="searchHistory.length === 0"
+                            class="wiki-search-status"
+                        >
+                            No recent searches.
+                        </div>
+
+                        <div
+                            v-for="item in searchHistory"
+                            :key="item"
+                            class="wiki-search-history-item"
+                        >
+                            <button
+                                type="button"
+                                class="wiki-search-history-select"
+                                :title="item"
+                                @click="selectSearchHistory(item)"
+                            >
+                                <svg
+                                    class="wiki-search-history-icon"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-width="2"
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    aria-hidden="true"
+                                >
+                                    <circle
+                                        cx="12"
+                                        cy="12"
+                                        r="9"
+                                    />
+                                    <path
+                                        d="M12 7v5l3 2"
+                                    />
+                                </svg>
+
+                                <span class="wiki-search-history-text">
+                                    {{ item }}
+                                </span>
+                            </button>
+
+                            <button
+                                type="button"
+                                class="wiki-search-history-remove"
+                                aria-label="Remove search from history"
+                                title="Remove"
+                                @click.stop="
+                                    removeSearchHistoryItem(item)
+                                "
+                            >
+                                ×
+                            </button>
+                        </div>
+                    </template>
                 </div>
             </div>
 
@@ -158,7 +240,44 @@
             <div class="file-tree">
                 <div class="tree-header-row">
                     <div class="tree-header">
-                        Files
+                        <span>Files</span>
+
+                        <div
+                            v-if="wikiRoot"
+                            class="tree-create-wrapper"
+                        >
+                            <button
+                                type="button"
+                                class="tree-create-button"
+                                aria-label="Create"
+                                title="Create"
+                                @click.stop="toggleCreateMenu"
+                            >
+                                +
+                            </button>
+
+                            <div
+                                v-if="createMenuVisible"
+                                class="tree-create-menu"
+                                @click.stop
+                            >
+                                <button
+                                    type="button"
+                                    class="tree-create-menu-item"
+                                    @click="openCreateDialog('file')"
+                                >
+                                    New Markdown file
+                                </button>
+
+                                <button
+                                    type="button"
+                                    class="tree-create-menu-item"
+                                    @click="openCreateDialog('folder')"
+                                >
+                                    New folder
+                                </button>
+                            </div>
+                        </div>
                     </div>
 
                     <div
@@ -196,6 +315,13 @@
                             All files
                         </button>
                     </div>
+                </div>
+
+                <div
+                    v-if="createError"
+                    class="tree-status tree-create-error"
+                >
+                    {{ createError }}
                 </div>
 
                 <div
@@ -400,17 +526,22 @@
                                 </div>
 
                                 <span
-                                    v-if="isDirty"
-                                    class="document-unsaved"
+                                    v-if="saveStatus"
+                                    class="document-save-status"
+                                    :class="{
+                                        'document-save-status-saving':
+                                            savingFile,
+                                        'document-save-status-error':
+                                            saveError,
+                                        'document-save-status-unsaved':
+                                            isDirty,
+                                        'document-save-status-saved':
+                                            !savingFile &&
+                                            !saveError &&
+                                            !isDirty,
+                                    }"
                                 >
-                                    Unsaved changes
-                                </span>
-
-                                <span
-                                    v-if="saveError"
-                                    class="document-save-error"
-                                >
-                                    {{ saveError }}
+                                    {{ saveStatus }}
                                 </span>
 
                                 <button
@@ -906,887 +1037,512 @@
                 </div>
             </div>
         </main>
+
+        <!--
+         * Create dialog.
+         -->
+        <div
+            v-if="createDialogVisible"
+            class="create-dialog-backdrop"
+            @click.self="closeCreateDialog"
+        >
+            <div
+                class="create-dialog"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="create-dialog-title"
+                tabindex="-1"
+                @keydown.esc="closeCreateDialog"
+            >
+                <div class="create-dialog-header">
+                    <h2 id="create-dialog-title">
+                        {{ createDialogTitle }}
+                    </h2>
+
+                    <button
+                        type="button"
+                        class="create-dialog-close"
+                        aria-label="Close"
+                        title="Close"
+                        :disabled="createDialogSubmitting"
+                        @click="closeCreateDialog"
+                    >
+                        ×
+                    </button>
+                </div>
+
+                <div class="create-dialog-body">
+                    <label
+                        for="create-dialog-name"
+                        class="create-dialog-label"
+                    >
+                        {{ createDialogNameLabel }}
+                    </label>
+
+                    <input
+                        id="create-dialog-name"
+                        ref="createDialogNameInput"
+                        v-model="createDialogName"
+                        type="text"
+                        class="create-dialog-input"
+                        autocomplete="off"
+                        :placeholder="
+                            createDialogType === 'folder'
+                                ? 'Folder name'
+                                : 'File name'
+                        "
+                        @keydown.enter.prevent="submitCreateDialog"
+                    />
+
+                    <div class="create-dialog-label">
+                        Create in
+                    </div>
+
+                    <div class="create-location-tree">
+                        <div
+                            class="create-location-row"
+                            :class="{
+                                'create-location-row-selected':
+                                    normalizePath(
+                                        createDialogFolder,
+                                    ) ===
+                                    normalizePath(
+                                        wikiRoot,
+                                    ),
+                            }"
+                        >
+                            <span
+                                class="create-location-toggle create-location-toggle-placeholder"
+                            />
+
+                            <button
+                                type="button"
+                                class="create-location-select"
+                                @click="
+                                    selectCreateDialogFolder(
+                                        wikiRoot,
+                                    )
+                                "
+                            >
+                                <svg
+                                    class="create-location-icon"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-width="1.8"
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    aria-hidden="true"
+                                >
+                                    <path
+                                        d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"
+                                    />
+                                </svg>
+
+                                <span class="create-location-name">
+                                    {{ wikiRootName }}
+                                </span>
+                            </button>
+                        </div>
+
+                        <ul
+                            v-if="createDialogFolders.length > 0"
+                            class="create-location-list"
+                        >
+                            <CreateLocationNode
+                                v-for="node in createDialogFolders"
+                                :key="node.path"
+                                :node="node"
+                                :selected-path="createDialogFolder"
+                                :expanded-folders="
+                                    createDialogExpandedFolders
+                                "
+                                @toggle-folder="
+                                    toggleCreateDialogFolder
+                                "
+                                @select-folder="
+                                    selectCreateDialogFolder
+                                "
+                            />
+                        </ul>
+
+                        <div
+                            v-else
+                            class="create-location-empty"
+                        >
+                            No subfolders.
+                        </div>
+                    </div>
+
+                    <div
+                        v-if="createDialogError"
+                        class="create-dialog-error"
+                    >
+                        {{ createDialogError }}
+                    </div>
+                </div>
+
+                <div class="create-dialog-footer">
+                    <button
+                        type="button"
+                        class="create-dialog-button create-dialog-button-secondary"
+                        :disabled="createDialogSubmitting"
+                        @click="closeCreateDialog"
+                    >
+                        Cancel
+                    </button>
+
+                    <button
+                        type="button"
+                        class="create-dialog-button create-dialog-button-primary"
+                        :disabled="
+                            createDialogSubmitting ||
+                            !createDialogName.trim()
+                        "
+                        @click="submitCreateDialog"
+                    >
+                        {{
+                            createDialogSubmitting
+                                ? 'Creating...'
+                                : 'Create'
+                        }}
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 </template>
 
 <script setup>
-import {
-    computed,
-    defineComponent,
-    h,
-    nextTick,
-    onBeforeUnmount,
-    onMounted,
-    ref,
-    watch,
-} from 'vue'
+    import {
+        computed,
+        defineComponent,
+        h,
+        nextTick,
+        onBeforeUnmount,
+        onMounted,
+        ref,
+        watch,
+    } from 'vue'
 
-import { marked } from 'marked'
-import DOMPurify from 'dompurify'
-import hljs from 'highlight.js/lib/common'
+    import { marked } from 'marked'
+    import DOMPurify from 'dompurify'
+    import hljs from 'highlight.js/lib/common'
 
-import {
-    getFilePickerBuilder,
-} from '@nextcloud/dialogs'
+    import {
+        getFilePickerBuilder,
+    } from '@nextcloud/dialogs'
 
-import '@nextcloud/dialogs/style.css'
+    import '@nextcloud/dialogs/style.css'
 
-const wikiRoot = ref('')
-const tree = ref([])
+    const wikiRoot = ref('')
+    const tree = ref([])
 
-const selectedFile = ref('')
-const selectedResource = ref(null)
+    const selectedFile = ref('')
+    const selectedResource = ref(null)
 
-const markdown = ref('')
-const editedMarkdown = ref('')
+    const markdown = ref('')
+    const editedMarkdown = ref('')
 
-const currentFolder = ref('')
+    const currentFolder = ref('')
 
-const loadingTree = ref(false)
-const loadingFile = ref(false)
-const savingFile = ref(false)
+    const loadingTree = ref(false)
+    const loadingFile = ref(false)
+    const savingFile = ref(false)
 
-const error = ref('')
-const fileError = ref('')
-const saveError = ref('')
+    const error = ref('')
+    const fileError = ref('')
+    const saveError = ref('')
 
-const copyError = ref('')
-const copiedResourcePath = ref(false)
+    const createError = ref('')
+    const createMenuVisible = ref(false)
 
-const expandedFolders = ref(new Set())
+    /*
+     * Create dialog state.
+     */
+    const createDialogVisible = ref(false)
+    const createDialogType = ref('file')
+    const createDialogName = ref('')
+    const createDialogFolder = ref('')
+    const createDialogError = ref('')
+    const createDialogSubmitting = ref(false)
+    const createDialogExpandedFolders = ref(new Set())
+    const createDialogNameInput = ref(null)
 
-/*
- * Editor state.
- */
-const editing = ref(false)
-const editorMode = ref('split')
-const editorTextarea = ref(null)
+    const copyError = ref('')
+    const copiedResourcePath = ref(false)
 
-/*
- * Search state.
- */
-const searchQuery = ref('')
-const searchResults = ref([])
-const searchLoading = ref(false)
-const searchError = ref('')
+    const expandedFolders = ref(new Set())
 
-let searchTimeout = null
-let searchRequestId = 0
+    /*
+     * Editor state.
+     */
+    const editing = ref(false)
+    const editorMode = ref('split')
+    const editorTextarea = ref(null)
 
-/*
- * Code block language.
- */
-const selectedCodeLanguage = ref('')
+    /*
+     * Search state.
+     */
+    const searchQuery = ref('')
+    const searchResults = ref([])
+    const searchLoading = ref(false)
+    const searchError = ref('')
 
-const codeLanguages = [
-    {
-        value: '',
-        label: 'Plain text',
-    },
-    {
-        value: 'bash',
-        label: 'Bash',
-    },
-    {
-        value: 'c',
-        label: 'C',
-    },
-    {
-        value: 'cpp',
-        label: 'C++',
-    },
-    {
-        value: 'csharp',
-        label: 'C#',
-    },
-    {
-        value: 'css',
-        label: 'CSS',
-    },
-    {
-        value: 'go',
-        label: 'Go',
-    },
-    {
-        value: 'html',
-        label: 'HTML',
-    },
-    {
-        value: 'java',
-        label: 'Java',
-    },
-    {
-        value: 'javascript',
-        label: 'JavaScript',
-    },
-    {
-        value: 'json',
-        label: 'JSON',
-    },
-    {
-        value: 'markdown',
-        label: 'Markdown',
-    },
-    {
-        value: 'php',
-        label: 'PHP',
-    },
-    {
-        value: 'python',
-        label: 'Python',
-    },
-    {
-        value: 'rust',
-        label: 'Rust',
-    },
-    {
-        value: 'sql',
-        label: 'SQL',
-    },
-    {
-        value: 'typescript',
-        label: 'TypeScript',
-    },
-]
+    const searchHistory = ref([])
+    const searchHistoryVisible = ref(false)
+    const searchContainer = ref(null)
 
-/*
- * File tree mode.
- */
-const treeMode = ref('markdown')
+    const searchHistoryStorageKey =
+        'markdown_wiki_search_history'
 
-function normalizePath(path) {
-    if (!path) {
-        return '/'
-    }
+    const maxSearchHistory = 10
 
-    return '/' + path.split('/').filter(Boolean).join('/')
-}
+    let searchTimeout = null
+    let searchRequestId = 0
 
-function getParentPath(path) {
-    const normalized = normalizePath(path)
+    /*
+     * Code block language.
+     */
+    const selectedCodeLanguage = ref('')
 
-    const parts = normalized
-        .split('/')
-        .filter(Boolean)
-
-    if (parts.length <= 1) {
-        return '/'
-    }
-
-    parts.pop()
-
-    return '/' + parts.join('/')
-}
-
-function getNameFromPath(path) {
-    const parts = path
-        .split('/')
-        .filter(Boolean)
-
-    return parts[parts.length - 1] || ''
-}
-
-function getDisplayFileName(path) {
-    const name = getNameFromPath(path)
-
-    if (name.toLowerCase().endsWith('.md')) {
-        return name.slice(0, -3)
-    }
-
-    return name
-}
-
-function getFileTypeLabel(fileType) {
-    const labels = {
-        markdown: 'Markdown document',
-        image: 'Image',
-        pdf: 'PDF document',
-        text: 'Text file',
-        code: 'Code file',
-        archive: 'Archive',
-        file: 'File',
-    }
-
-    return labels[fileType] || labels.file
-}
-
-function isExpanded(path) {
-    return expandedFolders.value.has(
-        normalizePath(path),
-    )
-}
-
-function findNode(nodes, path) {
-    const normalizedPath = normalizePath(path)
-
-    for (const node of nodes) {
-        if (
-            normalizePath(node.path) ===
-            normalizedPath
-        ) {
-            return node
-        }
-
-        if (
-            node.type === 'folder' &&
-            node.children.length > 0
-        ) {
-            const found = findNode(
-                node.children,
-                normalizedPath,
-            )
-
-            if (found) {
-                return found
-            }
-        }
-    }
-
-    return null
-}
-
-function buildTree(items) {
-    const folders = []
-    const files = []
-
-    for (const item of items) {
-        const node = {
-            name: item.name,
-            type: item.type,
-            fileType:
-                item.fileType ||
-                (
-                    item.type === 'folder'
-                        ? 'folder'
-                        : 'file'
-                ),
-            extension:
-                item.extension || '',
-            path: normalizePath(item.path),
-            children: [],
-            loaded: false,
-        }
-
-        if (item.type === 'folder') {
-            folders.push(node)
-        } else {
-            files.push(node)
-        }
-    }
-
-    folders.sort((a, b) =>
-        a.name.localeCompare(
-            b.name,
-            undefined,
-            { sensitivity: 'base' },
-        ),
-    )
-
-    files.sort((a, b) =>
-        a.name.localeCompare(
-            b.name,
-            undefined,
-            { sensitivity: 'base' },
-        ),
-    )
-
-    return [
-        ...folders,
-        ...files,
-    ]
-}
-
-async function fetchFolder(path) {
-    const url = new URL(
-        OC.generateUrl(
-            '/apps/markdown_wiki/api/files',
-        ),
-        window.location.origin,
-    )
-
-    url.searchParams.set(
-        'path',
-        normalizePath(path),
-    )
-
-    if (treeMode.value === 'all') {
-        url.searchParams.set(
-            'showAll',
-            'true',
-        )
-    }
-
-    const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-            Accept: 'application/json',
+    const codeLanguages = [
+        {
+            value: '',
+            label: 'Plain text',
         },
-    })
+        {
+            value: 'bash',
+            label: 'Bash',
+        },
+        {
+            value: 'c',
+            label: 'C',
+        },
+        {
+            value: 'cpp',
+            label: 'C++',
+        },
+        {
+            value: 'csharp',
+            label: 'C#',
+        },
+        {
+            value: 'css',
+            label: 'CSS',
+        },
+        {
+            value: 'go',
+            label: 'Go',
+        },
+        {
+            value: 'html',
+            label: 'HTML',
+        },
+        {
+            value: 'java',
+            label: 'Java',
+        },
+        {
+            value: 'javascript',
+            label: 'JavaScript',
+        },
+        {
+            value: 'json',
+            label: 'JSON',
+        },
+        {
+            value: 'markdown',
+            label: 'Markdown',
+        },
+        {
+            value: 'php',
+            label: 'PHP',
+        },
+        {
+            value: 'python',
+            label: 'Python',
+        },
+        {
+            value: 'rust',
+            label: 'Rust',
+        },
+        {
+            value: 'sql',
+            label: 'SQL',
+        },
+        {
+            value: 'typescript',
+            label: 'TypeScript',
+        },
+    ]
 
-    const data = await response.json()
+    /*
+     * File tree mode.
+     */
+    const treeMode = ref('markdown')
 
-    if (!response.ok) {
-        throw new Error(
-            data.message ||
-                'Failed to load folder.',
+    function normalizePath(path) {
+        if (!path) {
+            return '/'
+        }
+
+        return '/' + path.split('/').filter(Boolean).join('/')
+    }
+
+    function getParentPath(path) {
+        const normalized = normalizePath(path)
+
+        const parts = normalized
+            .split('/')
+            .filter(Boolean)
+
+        if (parts.length <= 1) {
+            return '/'
+        }
+
+        parts.pop()
+
+        return '/' + parts.join('/')
+    }
+
+    function getNameFromPath(path) {
+        const parts = path
+            .split('/')
+            .filter(Boolean)
+
+        return parts[parts.length - 1] || ''
+    }
+
+    function getDisplayFileName(path) {
+        const name = getNameFromPath(path)
+
+        if (name.toLowerCase().endsWith('.md')) {
+            return name.slice(0, -3)
+        }
+
+        return name
+    }
+
+    function getFileTypeLabel(fileType) {
+        const labels = {
+            markdown: 'Markdown document',
+            image: 'Image',
+            pdf: 'PDF document',
+            text: 'Text file',
+            code: 'Code file',
+            archive: 'Archive',
+            file: 'File',
+        }
+
+        return labels[fileType] || labels.file
+    }
+
+    function isExpanded(path) {
+        return expandedFolders.value.has(
+            normalizePath(path),
         )
     }
 
-    return data.items || []
-}
+    function findNode(nodes, path) {
+        const normalizedPath = normalizePath(path)
 
-async function loadRootTree(
-    resetState = true,
-) {
-    if (!wikiRoot.value) {
-        return
-    }
+        for (const node of nodes) {
+            if (
+                normalizePath(node.path) ===
+                normalizedPath
+            ) {
+                return node
+            }
 
-    loadingTree.value = true
-    error.value = ''
-
-    try {
-        const items = await fetchFolder(
-            wikiRoot.value,
-        )
-
-        tree.value = buildTree(items)
-
-        const root =
-            normalizePath(
-                wikiRoot.value,
-            )
-
-        if (resetState) {
-            expandedFolders.value =
-                new Set([root])
-
-            currentFolder.value = root
-        } else {
-            const next =
-                new Set(
-                    expandedFolders.value,
+            if (
+                node.type === 'folder' &&
+                node.children.length > 0
+            ) {
+                const found = findNode(
+                    node.children,
+                    normalizedPath,
                 )
 
-            next.add(root)
-
-            expandedFolders.value = next
-        }
-    } catch (err) {
-        error.value = err.message
-        tree.value = []
-    } finally {
-        loadingTree.value = false
-    }
-}
-
-async function loadFolderChildren(
-    node,
-    force = false,
-) {
-    if (
-        node.loaded &&
-        !force
-    ) {
-        return
-    }
-
-    try {
-        const items = await fetchFolder(
-            node.path,
-        )
-
-        node.children = buildTree(items)
-        node.loaded = true
-    } catch (err) {
-        error.value = err.message
-    }
-}
-
-async function restoreExpandedFolders(
-    paths,
-) {
-    if (!wikiRoot.value) {
-        return
-    }
-
-    const root =
-        normalizePath(
-            wikiRoot.value,
-        )
-
-    const sortedPaths =
-        [...paths]
-            .filter(
-                (path) =>
-                    normalizePath(path) !==
-                    root,
-            )
-            .sort(
-                (a, b) =>
-                    normalizePath(a)
-                        .split('/')
-                        .filter(Boolean)
-                        .length -
-                    normalizePath(b)
-                        .split('/')
-                        .filter(Boolean)
-                        .length,
-            )
-
-    const next =
-        new Set([root])
-
-    for (const path of sortedPaths) {
-        const normalizedPath =
-            normalizePath(path)
-
-        if (
-            normalizedPath === root ||
-            !normalizedPath.startsWith(
-                root + '/',
-            )
-        ) {
-            continue
+                if (found) {
+                    return found
+                }
+            }
         }
 
-        const node =
-            findNode(
-                tree.value,
-                normalizedPath,
-            )
+        return null
+    }
 
-        if (
-            node &&
-            node.type === 'folder'
-        ) {
-            await loadFolderChildren(node)
-            next.add(normalizedPath)
+    function buildTree(items) {
+        const folders = []
+        const files = []
+
+        for (const item of items) {
+            const node = {
+                name: item.name,
+                type: item.type,
+                fileType:
+                    item.fileType ||
+                    (
+                        item.type === 'folder'
+                            ? 'folder'
+                            : 'file'
+                    ),
+                extension:
+                    item.extension || '',
+                path: normalizePath(item.path),
+                children: [],
+                loaded: false,
+            }
+
+            if (item.type === 'folder') {
+                folders.push(node)
+            } else {
+                files.push(node)
+            }
         }
-    }
 
-    expandedFolders.value = next
-}
-
-async function setTreeMode(mode) {
-    if (
-        mode !== 'markdown' &&
-        mode !== 'all'
-    ) {
-        return
-    }
-
-    if (treeMode.value === mode) {
-        return
-    }
-
-    const previousExpanded =
-        [...expandedFolders.value]
-
-    const previousFolder =
-        currentFolder.value
-
-    treeMode.value = mode
-
-    await loadRootTree(false)
-
-    await restoreExpandedFolders(
-        previousExpanded,
-    )
-
-    const normalizedFolder =
-        normalizePath(
-            previousFolder ||
-                wikiRoot.value,
-        )
-
-    if (
-        normalizedFolder ===
-        normalizePath(wikiRoot.value)
-    ) {
-        currentFolder.value =
-            normalizePath(
-                wikiRoot.value,
-            )
-
-        return
-    }
-
-    const folderNode =
-        findNode(
-            tree.value,
-            normalizedFolder,
-        )
-
-    if (
-        folderNode &&
-        folderNode.type === 'folder'
-    ) {
-        await loadFolderChildren(
-            folderNode,
-        )
-
-        currentFolder.value =
-            normalizedFolder
-    } else {
-        currentFolder.value =
-            normalizePath(
-                wikiRoot.value,
-            )
-    }
-}
-
-async function toggleFolder(node) {
-    const path = normalizePath(node.path)
-
-    if (isExpanded(path)) {
-        const next = new Set(
-            expandedFolders.value,
-        )
-
-        next.delete(path)
-
-        expandedFolders.value = next
-
-        currentFolder.value = path
-
-        return
-    }
-
-    await loadFolderChildren(node)
-
-    const next = new Set(
-        expandedFolders.value,
-    )
-
-    next.add(path)
-
-    expandedFolders.value = next
-
-    currentFolder.value = path
-}
-
-/*
- * Search.
- */
-function scheduleSearch() {
-    if (searchTimeout !== null) {
-        window.clearTimeout(searchTimeout)
-        searchTimeout = null
-    }
-
-    if (!searchQuery.value.trim()) {
-        searchResults.value = []
-        searchLoading.value = false
-        searchError.value = ''
-        return
-    }
-
-    searchLoading.value = true
-
-    searchTimeout = window.setTimeout(() => {
-        searchTimeout = null
-        searchWiki()
-    }, 250)
-}
-
-async function searchWiki() {
-    const query = searchQuery.value.trim()
-
-    if (!query) {
-        searchResults.value = []
-        searchLoading.value = false
-        searchError.value = ''
-        return
-    }
-
-    if (!wikiRoot.value) {
-        searchResults.value = []
-        searchLoading.value = false
-        searchError.value =
-            'Wiki Root is not configured.'
-        return
-    }
-
-    const requestId = ++searchRequestId
-
-    searchLoading.value = true
-    searchError.value = ''
-
-    try {
-        const url = new URL(
-            OC.generateUrl(
-                '/apps/markdown_wiki/api/search',
+        folders.sort((a, b) =>
+            a.name.localeCompare(
+                b.name,
+                undefined,
+                { sensitivity: 'base' },
             ),
-            window.location.origin,
         )
 
-        url.searchParams.set(
-            'query',
-            query,
+        files.sort((a, b) =>
+            a.name.localeCompare(
+                b.name,
+                undefined,
+                { sensitivity: 'base' },
+            ),
         )
 
-        const response = await fetch(url, {
-            method: 'GET',
-            headers: {
-                Accept: 'application/json',
-            },
-        })
-
-        const data = await response.json()
-
-        if (!response.ok) {
-            throw new Error(
-                data.message ||
-                    'Failed to search Wiki.',
-            )
-        }
-
-        if (requestId !== searchRequestId) {
-            return
-        }
-
-        searchResults.value =
-            Array.isArray(data.results)
-                ? data.results
-                : []
-    } catch (err) {
-        if (requestId !== searchRequestId) {
-            return
-        }
-
-        searchResults.value = []
-        searchError.value =
-            err.message ||
-            'Failed to search Wiki.'
-    } finally {
-        if (requestId === searchRequestId) {
-            searchLoading.value = false
-        }
-    }
-}
-
-function clearSearch() {
-    if (searchTimeout !== null) {
-        window.clearTimeout(searchTimeout)
-        searchTimeout = null
+        return [
+            ...folders,
+            ...files,
+        ]
     }
 
-    searchRequestId++
-
-    searchQuery.value = ''
-    searchResults.value = []
-    searchLoading.value = false
-    searchError.value = ''
-}
-
-async function openSearchResult(result) {
-	if (!result || !result.path) {
-		return
-	}
-
-	clearSearch()
-	await openFile(result.path)
-}
-
-function getSearchResultDirectory(path) {
-    const normalizedPath =
-        normalizePath(path)
-
-    const root =
-        normalizePath(
-            wikiRoot.value,
-        )
-
-    const parent =
-        getParentPath(
-            normalizedPath,
-        )
-
-    if (parent === root) {
-        return '.'
-    }
-
-    if (
-        parent.startsWith(
-            root + '/',
-        )
-    ) {
-        return parent.slice(
-            root.length + 1,
-        )
-    }
-
-    return parent
-}
-
-/*
- * Ask whether it is safe to leave the current
- * document.
- */
-function confirmDiscardChanges() {
-    if (!editing.value || !isDirty.value) {
-        return true
-    }
-
-    return window.confirm(
-        'You have unsaved changes. Discard them?',
-    )
-}
-
-async function openFolder(path) {
-    if (!confirmDiscardChanges()) {
-        return
-    }
-
-    const normalizedPath =
-        normalizePath(path)
-
-    stopEditing()
-
-    selectedFile.value = ''
-    selectedResource.value = null
-    markdown.value = ''
-    editedMarkdown.value = ''
-    fileError.value = ''
-    saveError.value = ''
-    copyError.value = ''
-    copiedResourcePath.value = false
-
-    currentFolder.value = normalizedPath
-
-    if (
-        normalizedPath ===
-        normalizePath(wikiRoot.value)
-    ) {
-        const next = new Set(
-            expandedFolders.value,
-        )
-
-        next.add(normalizedPath)
-
-        expandedFolders.value = next
-
-        return
-    }
-
-    const node = findNode(
-        tree.value,
-        normalizedPath,
-    )
-
-    if (
-        node &&
-        node.type === 'folder'
-    ) {
-        await loadFolderChildren(node)
-
-        const next = new Set(
-            expandedFolders.value,
-        )
-
-        next.add(normalizedPath)
-
-        expandedFolders.value = next
-    }
-}
-
-function selectResource(node) {
-    if (!confirmDiscardChanges()) {
-        return
-    }
-
-    stopEditing()
-
-    selectedFile.value = ''
-    markdown.value = ''
-    editedMarkdown.value = ''
-    fileError.value = ''
-    saveError.value = ''
-    copyError.value = ''
-    copiedResourcePath.value = false
-
-    selectedResource.value = {
-        name: node.name,
-        type: node.type,
-        fileType: node.fileType,
-        extension: node.extension,
-        path: node.path,
-    }
-
-    currentFolder.value =
-        getParentPath(node.path)
-}
-
-async function openFile(path) {
-    if (
-        normalizePath(path) ===
-        normalizePath(selectedFile.value)
-    ) {
-        return
-    }
-
-    if (!confirmDiscardChanges()) {
-        return
-    }
-
-    stopEditing()
-
-    const filePath =
-        normalizePath(path)
-
-    const node =
-        findNode(
-            tree.value,
-            filePath,
-        )
-
-    /*
-     * Only Markdown files are documents
-     * that can currently be opened.
-     */
-    if (
-        node &&
-        node.type === 'file' &&
-        node.fileType !== 'markdown'
-    ) {
-        selectResource(node)
-        return
-    }
-
-    /*
-     * Extra defensive check for paths that
-     * are not present in the current tree.
-     */
-    if (
-        !filePath
-            .toLowerCase()
-            .endsWith('.md')
-    ) {
-        return
-    }
-
-    loadingFile.value = true
-    fileError.value = ''
-    saveError.value = ''
-
-    selectedFile.value = filePath
-    selectedResource.value = null
-    markdown.value = ''
-    editedMarkdown.value = ''
-
-    try {
+    async function fetchFolder(path) {
         const url = new URL(
             OC.generateUrl(
-                '/apps/markdown_wiki/api/file',
+                '/apps/markdown_wiki/api/files',
             ),
             window.location.origin,
         )
 
         url.searchParams.set(
             'path',
-            filePath,
+            normalizePath(path),
         )
+
+        if (treeMode.value === 'all') {
+            url.searchParams.set(
+                'showAll',
+                'true',
+            )
+        }
 
         const response = await fetch(url, {
             method: 'GET',
@@ -1800,281 +1556,1782 @@ async function openFile(path) {
         if (!response.ok) {
             throw new Error(
                 data.message ||
-                    'Failed to load Markdown file.',
+                    'Failed to load folder.',
             )
         }
 
-        markdown.value =
-            data.content || ''
+        return data.items || []
+    }
 
-        editedMarkdown.value =
-            markdown.value
+    async function loadRootTree(
+        resetState = true,
+    ) {
+        if (!wikiRoot.value) {
+            return
+        }
 
-        const parent =
-            getParentPath(filePath)
+        loadingTree.value = true
+        error.value = ''
 
-        currentFolder.value = parent
+        try {
+            const items = await fetchFolder(
+                wikiRoot.value,
+            )
 
-        /*
-         * Make sure every parent folder of the
-         * selected file is expanded.
-         */
+            tree.value = buildTree(items)
+
+            const root =
+                normalizePath(
+                    wikiRoot.value,
+                )
+
+            if (resetState) {
+                expandedFolders.value =
+                    new Set([root])
+
+                currentFolder.value = root
+            } else {
+                const next =
+                    new Set(
+                        expandedFolders.value,
+                    )
+
+                next.add(root)
+
+                expandedFolders.value = next
+            }
+        } catch (err) {
+            error.value = err.message
+            tree.value = []
+        } finally {
+            loadingTree.value = false
+        }
+    }
+
+    async function loadFolderChildren(
+        node,
+        force = false,
+    ) {
+        if (
+            node.loaded &&
+            !force
+        ) {
+            return
+        }
+
+        const items = await fetchFolder(
+            node.path,
+        )
+
+        node.children = buildTree(items)
+        node.loaded = true
+    }
+
+    async function restoreExpandedFolders(
+        paths,
+    ) {
+        if (!wikiRoot.value) {
+            return
+        }
+
         const root =
             normalizePath(
                 wikiRoot.value,
             )
 
-        const relative =
-            filePath.slice(root.length)
+        const sortedPaths =
+            [...paths]
+                .filter(
+                    (path) =>
+                        normalizePath(path) !==
+                        root,
+                )
+                .sort(
+                    (a, b) =>
+                        normalizePath(a)
+                            .split('/')
+                            .filter(Boolean)
+                            .length -
+                        normalizePath(b)
+                            .split('/')
+                            .filter(Boolean)
+                            .length,
+                )
 
-        const parts =
-            relative
-                .split('/')
-                .filter(Boolean)
+        const next =
+            new Set([root])
 
-        parts.pop()
+        for (const path of sortedPaths) {
+            const normalizedPath =
+                normalizePath(path)
 
-        let currentPath = root
+            if (
+                normalizedPath === root ||
+                !normalizedPath.startsWith(
+                    root + '/',
+                )
+            ) {
+                continue
+            }
 
-        const foldersToExpand = []
-
-        for (const part of parts) {
-            currentPath +=
-                '/' + part
-
-            foldersToExpand.push(
-                currentPath,
-            )
-        }
-
-        for (
-            const folderPath
-            of foldersToExpand
-        ) {
-            const folderNode =
+            const node =
                 findNode(
                     tree.value,
-                    folderPath,
+                    normalizedPath,
                 )
 
             if (
-                folderNode &&
-                folderNode.type ===
-                    'folder'
+                node &&
+                node.type === 'folder'
             ) {
-                await loadFolderChildren(
-                    folderNode,
-                )
+                await loadFolderChildren(node)
+                next.add(normalizedPath)
             }
         }
+
+        expandedFolders.value = next
+    }
+
+    async function setTreeMode(mode) {
+        if (
+            mode !== 'markdown' &&
+            mode !== 'all'
+        ) {
+            return
+        }
+
+        if (treeMode.value === mode) {
+            return
+        }
+
+        const previousExpanded =
+            [...expandedFolders.value]
+
+        const previousFolder =
+            currentFolder.value
+
+        treeMode.value = mode
+
+        await loadRootTree(false)
+
+        await restoreExpandedFolders(
+            previousExpanded,
+        )
+
+        const normalizedFolder =
+            normalizePath(
+                previousFolder ||
+                    wikiRoot.value,
+            )
+
+        if (
+            normalizedFolder ===
+            normalizePath(wikiRoot.value)
+        ) {
+            currentFolder.value =
+                normalizePath(
+                    wikiRoot.value,
+                )
+
+            return
+        }
+
+        const folderNode =
+            findNode(
+                tree.value,
+                normalizedFolder,
+            )
+
+        if (
+            folderNode &&
+            folderNode.type === 'folder'
+        ) {
+            await loadFolderChildren(
+                folderNode,
+            )
+
+            currentFolder.value =
+                normalizedFolder
+        } else {
+            currentFolder.value =
+                normalizePath(
+                    wikiRoot.value,
+                )
+        }
+    }
+
+    async function toggleFolder(node) {
+        const path = normalizePath(node.path)
+
+        if (isExpanded(path)) {
+            const next = new Set(
+                expandedFolders.value,
+            )
+
+            next.delete(path)
+
+            expandedFolders.value = next
+
+            currentFolder.value = path
+
+            return
+        }
+
+        await loadFolderChildren(node)
 
         const next = new Set(
             expandedFolders.value,
         )
 
-        next.add(root)
-
-        for (
-            const folderPath
-            of foldersToExpand
-        ) {
-            next.add(folderPath)
-        }
+        next.add(path)
 
         expandedFolders.value = next
-    } catch (err) {
-        fileError.value =
-            err.message
-    } finally {
-        loadingFile.value = false
-    }
-}
 
-/*
- * Start editing the currently opened Markdown file.
- */
-async function startEditing() {
-    if (!selectedFile.value || loadingFile.value) {
-        return
+        currentFolder.value = path
     }
 
-    saveError.value = ''
-
-    editedMarkdown.value =
-        markdown.value
-
-    selectedCodeLanguage.value = ''
-
-    editorMode.value = 'split'
-    editing.value = true
-
-    await nextTick()
-
-    if (editorTextarea.value) {
-        editorTextarea.value.focus()
+    /*
+     * Create menu.
+     */
+    function toggleCreateMenu() {
+        createError.value = ''
+        createMenuVisible.value =
+            !createMenuVisible.value
     }
-}
 
-/*
- * Stop editing without changing the saved document.
- */
-function stopEditing() {
-    editing.value = false
-    editedMarkdown.value = markdown.value
-    saveError.value = ''
-    selectedCodeLanguage.value = ''
-}
+    const createDialogTitle = computed(() =>
+        createDialogType.value === 'folder'
+            ? 'New folder'
+            : 'New Markdown file',
+    )
 
-/*
- * Cancel the current editing session.
- */
-function cancelEditing() {
-    if (
-        isDirty.value &&
-        !window.confirm(
-            'Discard your unsaved changes?',
-        )
+    const createDialogNameLabel = computed(() =>
+        createDialogType.value === 'folder'
+            ? 'Folder name'
+            : 'File name',
+    )
+
+    const createDialogFolders = computed(() =>
+        tree.value.filter(
+            (node) => node.type === 'folder',
+        ),
+    )
+
+    async function prepareCreateDialogTree(
+        selectedPath,
     ) {
-        return
+        const root =
+            normalizePath(
+                wikiRoot.value,
+            )
+
+        const target =
+            normalizePath(
+                selectedPath || root,
+            )
+
+        createDialogFolder.value = target
+
+        const expanded =
+            new Set([root])
+
+        if (
+            target !== root &&
+            target.startsWith(root + '/')
+        ) {
+            const relativeParts =
+                target
+                    .slice(root.length + 1)
+                    .split('/')
+                    .filter(Boolean)
+
+            let currentPath = root
+
+            for (const part of relativeParts) {
+                currentPath =
+                    normalizePath(
+                        currentPath +
+                            '/' +
+                            part,
+                    )
+
+                const node =
+                    findNode(
+                        tree.value,
+                        currentPath,
+                    )
+
+                if (
+                    !node ||
+                    node.type !== 'folder'
+                ) {
+                    break
+                }
+
+                await loadFolderChildren(node)
+
+                expanded.add(currentPath)
+            }
+        }
+
+        createDialogExpandedFolders.value =
+            expanded
     }
 
-    stopEditing()
-}
+    async function openCreateDialog(type) {
+        createMenuVisible.value = false
+        createError.value = ''
 
-/*
- * Get the currently active Markdown textarea.
- */
-function getEditorElement() {
-    const element = editorTextarea.value
+        if (!wikiRoot.value) {
+            createError.value =
+                'Wiki Root is not configured.'
 
-    if (
-        element instanceof HTMLTextAreaElement
-    ) {
-        return element
-    }
-
-    return null
-}
-
-/*
- * Replace text in the editor while preserving
- * the cursor/selection.
- */
-function replaceEditorText(
-    start,
-    end,
-    replacement,
-    selectionStart = null,
-    selectionEnd = null,
-) {
-    const textarea = getEditorElement()
-
-    if (!textarea) {
-        return
-    }
-
-    const value = editedMarkdown.value
-
-    editedMarkdown.value =
-        value.slice(0, start) +
-        replacement +
-        value.slice(end)
-
-    nextTick(() => {
-        const element = getEditorElement()
-
-        if (!element) {
             return
         }
 
-        element.focus()
+        if (!confirmDiscardChanges()) {
+            return
+        }
 
-        const nextStart =
-            selectionStart !== null
-                ? selectionStart
-                : start + replacement.length
+        createDialogType.value = type
+        createDialogName.value = ''
+        createDialogError.value = ''
+        createDialogSubmitting.value = false
 
-        const nextEnd =
-            selectionEnd !== null
-                ? selectionEnd
-                : nextStart
+        const selectedFolder =
+            normalizePath(
+                currentFolder.value ||
+                    wikiRoot.value,
+            )
 
-        element.setSelectionRange(
-            nextStart,
-            nextEnd,
+        await prepareCreateDialogTree(
+            selectedFolder,
         )
-    })
-}
 
-/*
- * Apply or remove inline Markdown formatting.
- */
-function applyInlineFormatting(
-    prefix,
-    suffix,
-) {
-    const textarea = getEditorElement()
+        createDialogVisible.value = true
 
-    if (!textarea) {
-        return
+        await nextTick()
+
+        if (createDialogNameInput.value) {
+            createDialogNameInput.value.focus()
+        }
     }
 
-    const start = textarea.selectionStart
-    const end = textarea.selectionEnd
-    const value = editedMarkdown.value
+    function closeCreateDialog(force = false) {
+        if (
+            createDialogSubmitting.value &&
+            !force
+        ) {
+            return
+        }
 
-    const selectedText =
-        value.slice(start, end)
+        createDialogVisible.value = false
+        createDialogName.value = ''
+        createDialogError.value = ''
+        createDialogSubmitting.value = false
+    }
+
+    function selectCreateDialogFolder(
+        path,
+    ) {
+        const normalizedPath =
+            normalizePath(path)
+
+        if (
+            !isInsideWikiRoot(
+                normalizedPath,
+            )
+        ) {
+            return
+        }
+
+        createDialogFolder.value =
+            normalizedPath
+    }
+
+    async function toggleCreateDialogFolder(node) {
+        const path = normalizePath(node.path)
+
+        if (createDialogExpandedFolders.value.has(path)) {
+            const next = new Set(createDialogExpandedFolders.value)
+            next.delete(path)
+            createDialogExpandedFolders.value = next
+            return
+        }
+
+        try {
+            await loadFolderChildren(node, true)
+
+            const next = new Set(createDialogExpandedFolders.value)
+            next.add(path)
+            createDialogExpandedFolders.value = next
+        } catch (err) {
+            createDialogError.value =
+                err.message || 'Failed to load folder contents.'
+        }
+    }
+
+    async function refreshCreateParent(
+        parentFolder,
+    ) {
+        if (
+            parentFolder ===
+            normalizePath(wikiRoot.value)
+        ) {
+            await loadRootTree(false)
+            return
+        }
+
+        const parentNode =
+            findNode(
+                tree.value,
+                parentFolder,
+            )
+
+        if (
+            parentNode &&
+            parentNode.type === 'folder'
+        ) {
+            await loadFolderChildren(
+                parentNode,
+                true,
+            )
+
+            return
+        }
+
+        await loadRootTree(false)
+
+        await restoreExpandedFolders(
+            expandedFolders.value,
+        )
+    }
+
+    async function submitCreateDialog() {
+        createDialogError.value = ''
+
+        if (createDialogSubmitting.value) {
+            return
+        }
+
+        if (!wikiRoot.value) {
+            createDialogError.value =
+                'Wiki Root is not configured.'
+
+            return
+        }
+
+        let name =
+            createDialogName.value.trim()
+
+        if (!name) {
+            createDialogError.value =
+                createDialogType.value === 'folder'
+                    ? 'Please enter a folder name.'
+                    : 'Please enter a file name.'
+
+            return
+        }
+
+        if (
+            name.includes('/') ||
+            name.includes('\\') ||
+            name === '.' ||
+            name === '..' ||
+            name.includes('..')
+        ) {
+            createDialogError.value =
+                'Invalid name.'
+
+            return
+        }
+
+        const parentFolder =
+            normalizePath(
+                createDialogFolder.value ||
+                    wikiRoot.value,
+            )
+
+        if (!isInsideWikiRoot(parentFolder)) {
+            createDialogError.value =
+                'The destination must be inside the Wiki Root.'
+
+            return
+        }
+
+        const isFolder =
+            createDialogType.value === 'folder'
+
+        if (
+            !isFolder &&
+            !name
+                .toLowerCase()
+                .endsWith('.md')
+        ) {
+            name += '.md'
+        }
+
+        const path =
+            normalizePath(
+                parentFolder +
+                    '/' +
+                    name,
+            )
+
+        if (!isInsideWikiRoot(path)) {
+            createDialogError.value =
+                isFolder
+                    ? 'The folder must be inside the Wiki Root.'
+                    : 'The file must be inside the Wiki Root.'
+
+            return
+        }
+
+        createDialogSubmitting.value = true
+
+        try {
+            const body =
+                new URLSearchParams()
+
+            body.set(
+                'path',
+                path,
+            )
+
+            const endpoint =
+                isFolder
+                    ? '/apps/markdown_wiki/api/create-folder'
+                    : '/apps/markdown_wiki/api/create-file'
+
+            const response = await fetch(
+                OC.generateUrl(endpoint),
+                {
+                    method: 'POST',
+                    headers: {
+                        Accept: 'application/json',
+                        'Content-Type':
+                            'application/x-www-form-urlencoded;charset=UTF-8',
+                    },
+                    body,
+                },
+            )
+
+            const data =
+                await response.json()
+
+            if (!response.ok) {
+                throw new Error(
+                    data.message ||
+                        (
+                            isFolder
+                                ? 'Failed to create folder.'
+                                : 'Failed to create Markdown file.'
+                        ),
+                )
+            }
+
+            const createdPath =
+                normalizePath(
+                    data.path || path,
+                )
+
+            await refreshCreateParent(
+                parentFolder,
+            )
+
+            if (isFolder) {
+                /*
+                 * Open the newly created folder.
+                 */
+                const folderNode =
+                    findNode(
+                        tree.value,
+                        createdPath,
+                    )
+
+                if (
+                    folderNode &&
+                    folderNode.type === 'folder'
+                ) {
+                    await loadFolderChildren(
+                        folderNode,
+                        true,
+                    )
+
+                    const next =
+                        new Set(
+                            expandedFolders.value,
+                        )
+
+                    next.add(createdPath)
+
+                    expandedFolders.value =
+                        next
+
+                    currentFolder.value =
+                        createdPath
+                } else {
+                    currentFolder.value =
+                        createdPath
+                }
+
+                /*
+                 * Clear the current selection because
+                 * the user is now inside the new folder.
+                 */
+                selectedFile.value = ''
+                selectedResource.value = null
+                markdown.value = ''
+                editedMarkdown.value = ''
+                fileError.value = ''
+                saveError.value = ''
+                copyError.value = ''
+                copiedResourcePath.value = false
+            } else {
+                /*
+                 * Open the newly created Markdown file.
+                 */
+                selectedFile.value = ''
+                selectedResource.value = null
+                markdown.value = ''
+                editedMarkdown.value = ''
+                fileError.value = ''
+                saveError.value = ''
+                copyError.value = ''
+                copiedResourcePath.value = false
+
+                await openFile(createdPath)
+
+                editing.value = true
+                editedMarkdown.value =
+                    markdown.value
+
+                editorMode.value = 'split'
+                selectedCodeLanguage.value = ''
+
+                await nextTick()
+
+                if (editorTextarea.value) {
+                    editorTextarea.value.focus()
+                }
+            }
+
+            createDialogVisible.value = false
+            createDialogName.value = ''
+            createDialogError.value = ''
+        } catch (err) {
+            createDialogError.value =
+                err.message ||
+                (
+                    isFolder
+                        ? 'Failed to create folder.'
+                        : 'Failed to create Markdown file.'
+                )
+        } finally {
+            createDialogSubmitting.value = false
+        }
+    }
 
     /*
-     * If the selected text is already wrapped
-     * by the requested formatting, remove it.
+     * Search history.
      */
-    if (
-        selectedText.length >=
-            prefix.length +
-                suffix.length &&
-        selectedText.startsWith(prefix) &&
-        selectedText.endsWith(suffix)
-    ) {
-        const unformatted =
-            selectedText.slice(
-                prefix.length,
-                selectedText.length -
-                    suffix.length,
+    function loadSearchHistory() {
+        try {
+            const stored =
+                window.localStorage.getItem(
+                    searchHistoryStorageKey,
+                )
+
+            const parsed =
+                stored
+                    ? JSON.parse(stored)
+                    : []
+
+            searchHistory.value =
+                Array.isArray(parsed)
+                    ? parsed
+                        .filter(
+                            (item) =>
+                                typeof item === 'string' &&
+                                item.trim() !== '',
+                        )
+                        .slice(
+                            0,
+                            maxSearchHistory,
+                        )
+                    : []
+        } catch (err) {
+            searchHistory.value = []
+        }
+    }
+
+    function saveSearchHistory() {
+        try {
+            window.localStorage.setItem(
+                searchHistoryStorageKey,
+                JSON.stringify(
+                    searchHistory.value,
+                ),
             )
+        } catch (err) {
+            // Ignore localStorage errors.
+        }
+    }
+
+    function addSearchToHistory(query) {
+        const normalizedQuery =
+            query.trim()
+
+        if (!normalizedQuery) {
+            return
+        }
+
+        const next =
+            searchHistory.value.filter(
+                (item) =>
+                    item.toLowerCase() !==
+                    normalizedQuery.toLowerCase(),
+            )
+
+        next.unshift(normalizedQuery)
+
+        searchHistory.value =
+            next.slice(
+                0,
+                maxSearchHistory,
+            )
+
+        saveSearchHistory()
+    }
+
+    function removeSearchHistoryItem(
+        query,
+    ) {
+        searchHistory.value =
+            searchHistory.value.filter(
+                (item) => item !== query,
+            )
+
+        saveSearchHistory()
+    }
+
+    function clearSearchHistory() {
+        searchHistory.value = []
+
+        saveSearchHistory()
+    }
+
+    function handleSearchFocus() {
+        if (!searchQuery.value.trim()) {
+            searchHistoryVisible.value = true
+        }
+    }
+
+    function selectSearchHistory(query) {
+        if (searchTimeout !== null) {
+            window.clearTimeout(searchTimeout)
+            searchTimeout = null
+        }
+
+        searchHistoryVisible.value = false
+        searchQuery.value = query
+    }
+
+    function handleDocumentClick(event) {
+        const container =
+            searchContainer.value
+
+        if (
+            !container ||
+            container.contains(event.target)
+        ) {
+            return
+        }
+
+        searchHistoryVisible.value = false
+        createMenuVisible.value = false
+    }
+
+    /*
+     * Search.
+     */
+    function scheduleSearch() {
+        if (searchTimeout !== null) {
+            window.clearTimeout(searchTimeout)
+            searchTimeout = null
+        }
+
+        if (!searchQuery.value.trim()) {
+            searchResults.value = []
+            searchLoading.value = false
+            searchError.value = ''
+            return
+        }
+
+        searchHistoryVisible.value = false
+        searchLoading.value = true
+
+        searchTimeout = window.setTimeout(() => {
+            searchTimeout = null
+            searchWiki()
+        }, 250)
+    }
+
+    async function searchWiki() {
+        const query = searchQuery.value.trim()
+
+        if (!query) {
+            searchResults.value = []
+            searchLoading.value = false
+            searchError.value = ''
+            return
+        }
+
+        if (!wikiRoot.value) {
+            searchResults.value = []
+            searchLoading.value = false
+            searchError.value =
+                'Wiki Root is not configured.'
+            return
+        }
+
+        const requestId = ++searchRequestId
+
+        searchLoading.value = true
+        searchError.value = ''
+
+        try {
+            const url = new URL(
+                OC.generateUrl(
+                    '/apps/markdown_wiki/api/search',
+                ),
+                window.location.origin,
+            )
+
+            url.searchParams.set(
+                'query',
+                query,
+            )
+
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    Accept: 'application/json',
+                },
+            })
+
+            const data = await response.json()
+
+            if (!response.ok) {
+                throw new Error(
+                    data.message ||
+                        'Failed to search Wiki.',
+                )
+            }
+
+            if (requestId !== searchRequestId) {
+                return
+            }
+
+            searchResults.value =
+                Array.isArray(data.results)
+                    ? data.results
+                    : []
+
+            addSearchToHistory(query)
+        } catch (err) {
+            if (requestId !== searchRequestId) {
+                return
+            }
+
+            searchResults.value = []
+            searchError.value =
+                err.message ||
+                'Failed to search Wiki.'
+        } finally {
+            if (requestId === searchRequestId) {
+                searchLoading.value = false
+            }
+        }
+    }
+
+    function clearSearch() {
+        if (searchTimeout !== null) {
+            window.clearTimeout(searchTimeout)
+            searchTimeout = null
+        }
+
+        searchRequestId++
+
+        searchQuery.value = ''
+        searchResults.value = []
+        searchLoading.value = false
+        searchError.value = ''
+        searchHistoryVisible.value = false
+    }
+
+    async function openSearchResult(result) {
+        if (!result || !result.path) {
+            return
+        }
+
+        clearSearch()
+        await openFile(result.path)
+    }
+
+    function getSearchResultDirectory(path) {
+        const normalizedPath =
+            normalizePath(path)
+
+        const root =
+            normalizePath(
+                wikiRoot.value,
+            )
+
+        const parent =
+            getParentPath(
+                normalizedPath,
+            )
+
+        if (parent === root) {
+            return '.'
+        }
+
+        if (
+            parent.startsWith(
+                root + '/',
+            )
+        ) {
+            return parent.slice(
+                root.length + 1,
+            )
+        }
+
+        return parent
+    }
+
+    /*
+     * Ask whether it is safe to leave the current
+     * document.
+     */
+    function confirmDiscardChanges() {
+        if (!editing.value || !isDirty.value) {
+            return true
+        }
+
+        return window.confirm(
+            'You have unsaved changes. Discard them?',
+        )
+    }
+
+    async function openFolder(path) {
+        if (!confirmDiscardChanges()) {
+            return
+        }
+
+        const normalizedPath =
+            normalizePath(path)
+
+        stopEditing()
+
+        selectedFile.value = ''
+        selectedResource.value = null
+        markdown.value = ''
+        editedMarkdown.value = ''
+        fileError.value = ''
+        saveError.value = ''
+        copyError.value = ''
+        copiedResourcePath.value = false
+
+        currentFolder.value = normalizedPath
+
+        if (
+            normalizedPath ===
+            normalizePath(wikiRoot.value)
+        ) {
+            const next = new Set(
+                expandedFolders.value,
+            )
+
+            next.add(normalizedPath)
+
+            expandedFolders.value = next
+
+            return
+        }
+
+        const node = findNode(
+            tree.value,
+            normalizedPath,
+        )
+
+        if (
+            node &&
+            node.type === 'folder'
+        ) {
+            await loadFolderChildren(node)
+
+            const next = new Set(
+                expandedFolders.value,
+            )
+
+            next.add(normalizedPath)
+
+            expandedFolders.value = next
+        }
+    }
+
+    function selectResource(node) {
+        if (!confirmDiscardChanges()) {
+            return
+        }
+
+        stopEditing()
+
+        selectedFile.value = ''
+        markdown.value = ''
+        editedMarkdown.value = ''
+        fileError.value = ''
+        saveError.value = ''
+        copyError.value = ''
+        copiedResourcePath.value = false
+
+        selectedResource.value = {
+            name: node.name,
+            type: node.type,
+            fileType: node.fileType,
+            extension: node.extension,
+            path: node.path,
+        }
+
+        currentFolder.value =
+            getParentPath(node.path)
+    }
+
+    async function openFile(path) {
+        if (
+            normalizePath(path) ===
+            normalizePath(selectedFile.value)
+        ) {
+            return
+        }
+
+        if (!confirmDiscardChanges()) {
+            return
+        }
+
+        stopEditing()
+
+        const filePath =
+            normalizePath(path)
+
+        const node =
+            findNode(
+                tree.value,
+                filePath,
+            )
+
+        if (
+            node &&
+            node.type === 'file' &&
+            node.fileType !== 'markdown'
+        ) {
+            selectResource(node)
+            return
+        }
+
+        if (
+            !filePath
+                .toLowerCase()
+                .endsWith('.md')
+        ) {
+            return
+        }
+
+        loadingFile.value = true
+        fileError.value = ''
+        saveError.value = ''
+
+        selectedFile.value = filePath
+        selectedResource.value = null
+        markdown.value = ''
+        editedMarkdown.value = ''
+
+        try {
+            const url = new URL(
+                OC.generateUrl(
+                    '/apps/markdown_wiki/api/file',
+                ),
+                window.location.origin,
+            )
+
+            url.searchParams.set(
+                'path',
+                filePath,
+            )
+
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    Accept: 'application/json',
+                },
+            })
+
+            const data = await response.json()
+
+            if (!response.ok) {
+                throw new Error(
+                    data.message ||
+                        'Failed to load Markdown file.',
+                )
+            }
+
+            markdown.value =
+                data.content || ''
+
+            editedMarkdown.value =
+                markdown.value
+
+            const parent =
+                getParentPath(filePath)
+
+            currentFolder.value = parent
+
+            const root =
+                normalizePath(
+                    wikiRoot.value,
+                )
+
+            const relative =
+                filePath.slice(root.length)
+
+            const parts =
+                relative
+                    .split('/')
+                    .filter(Boolean)
+
+            parts.pop()
+
+            let currentPath = root
+
+            const foldersToExpand = []
+
+            for (const part of parts) {
+                currentPath +=
+                    '/' + part
+
+                foldersToExpand.push(
+                    currentPath,
+                )
+            }
+
+            for (
+                const folderPath
+                of foldersToExpand
+            ) {
+                const folderNode =
+                    findNode(
+                        tree.value,
+                        folderPath,
+                    )
+
+                if (
+                    folderNode &&
+                    folderNode.type ===
+                        'folder'
+                ) {
+                    await loadFolderChildren(
+                        folderNode,
+                    )
+                }
+            }
+
+            const next = new Set(
+                expandedFolders.value,
+            )
+
+            next.add(root)
+
+            for (
+                const folderPath
+                of foldersToExpand
+            ) {
+                next.add(folderPath)
+            }
+
+            expandedFolders.value = next
+        } catch (err) {
+            fileError.value =
+                err.message
+        } finally {
+            loadingFile.value = false
+        }
+    }
+
+    async function startEditing() {
+        if (!selectedFile.value || loadingFile.value) {
+            return
+        }
+
+        saveError.value = ''
+
+        editedMarkdown.value =
+            markdown.value
+
+        selectedCodeLanguage.value = ''
+
+        editorMode.value = 'split'
+        editing.value = true
+
+        await nextTick()
+
+        if (editorTextarea.value) {
+            editorTextarea.value.focus()
+        }
+    }
+
+    function stopEditing() {
+        editing.value = false
+        editedMarkdown.value = markdown.value
+        saveError.value = ''
+        selectedCodeLanguage.value = ''
+    }
+
+    function cancelEditing() {
+        if (
+            isDirty.value &&
+            !window.confirm(
+                'Discard your unsaved changes?',
+            )
+        ) {
+            return
+        }
+
+        stopEditing()
+    }
+
+    function getEditorElement() {
+        const element = editorTextarea.value
+
+        if (
+            element instanceof HTMLTextAreaElement
+        ) {
+            return element
+        }
+
+        return null
+    }
+
+    function replaceEditorText(
+        start,
+        end,
+        replacement,
+        selectionStart = null,
+        selectionEnd = null,
+    ) {
+        const textarea = getEditorElement()
+
+        if (!textarea) {
+            return
+        }
+
+        const value = editedMarkdown.value
+
+        editedMarkdown.value =
+            value.slice(0, start) +
+            replacement +
+            value.slice(end)
+
+        nextTick(() => {
+            const element = getEditorElement()
+
+            if (!element) {
+                return
+            }
+
+            element.focus()
+
+            const nextStart =
+                selectionStart !== null
+                    ? selectionStart
+                    : start + replacement.length
+
+            const nextEnd =
+                selectionEnd !== null
+                    ? selectionEnd
+                    : nextStart
+
+            element.setSelectionRange(
+                nextStart,
+                nextEnd,
+            )
+        })
+    }
+
+    function applyInlineFormatting(
+        prefix,
+        suffix,
+    ) {
+        const textarea = getEditorElement()
+
+        if (!textarea) {
+            return
+        }
+
+        const start = textarea.selectionStart
+        const end = textarea.selectionEnd
+        const value = editedMarkdown.value
+
+        const selectedText =
+            value.slice(start, end)
+
+        if (
+            selectedText.length >=
+                prefix.length +
+                    suffix.length &&
+            selectedText.startsWith(prefix) &&
+            selectedText.endsWith(suffix)
+        ) {
+            const unformatted =
+                selectedText.slice(
+                    prefix.length,
+                    selectedText.length -
+                        suffix.length,
+                )
+
+            replaceEditorText(
+                start,
+                end,
+                unformatted,
+                start,
+                start + unformatted.length,
+            )
+
+            return
+        }
+
+        if (!selectedText) {
+            const placeholder =
+                prefix === '**'
+                    ? 'bold text'
+                    : prefix === '*'
+                        ? 'italic text'
+                        : prefix === '~~'
+                            ? 'strikethrough text'
+                            : 'code'
+
+            const replacement =
+                prefix +
+                placeholder +
+                suffix
+
+            const placeholderStart =
+                start + prefix.length
+
+            const placeholderEnd =
+                placeholderStart +
+                placeholder.length
+
+            replaceEditorText(
+                start,
+                end,
+                replacement,
+                placeholderStart,
+                placeholderEnd,
+            )
+
+            return
+        }
+
+        const replacement =
+            prefix +
+            selectedText +
+            suffix
 
         replaceEditorText(
             start,
             end,
-            unformatted,
+            replacement,
             start,
-            start + unformatted.length,
+            start + replacement.length,
         )
-
-        return
     }
 
-    /*
-     * No selection.
-     */
-    if (!selectedText) {
-        const placeholder =
-            prefix === '**'
-                ? 'bold text'
-                : prefix === '*'
-                    ? 'italic text'
-                    : prefix === '~~'
-                        ? 'strikethrough text'
-                        : 'code'
+    function getSelectedLineRange() {
+        const textarea = getEditorElement()
+
+        if (!textarea) {
+            return null
+        }
+
+        const value = editedMarkdown.value
+        const start = textarea.selectionStart
+        const end = textarea.selectionEnd
+
+        const lineStart =
+            value.lastIndexOf(
+                '\n',
+                Math.max(0, start - 1),
+            ) + 1
+
+        let lineEnd =
+            value.indexOf(
+                '\n',
+                end,
+            )
+
+        if (lineEnd === -1) {
+            lineEnd = value.length
+        }
+
+        return {
+            start,
+            end,
+            lineStart,
+            lineEnd,
+            text: value.slice(
+                lineStart,
+                lineEnd,
+            ),
+        }
+    }
+
+    function applyLinePrefix(prefix) {
+        const range = getSelectedLineRange()
+
+        if (!range) {
+            return
+        }
+
+        const lines =
+            range.text.split('\n')
 
         const replacement =
-            prefix +
-            placeholder +
-            suffix
+            lines
+                .map((line) => {
+                    const content =
+                        line.replace(
+                            /^#{1,6}\s+/,
+                            '',
+                        )
+
+                    if (!content.trim()) {
+                        return prefix.trimEnd()
+                    }
+
+                    return prefix + content
+                })
+                .join('\n')
+
+        replaceEditorText(
+            range.lineStart,
+            range.lineEnd,
+            replacement,
+            range.lineStart,
+            range.lineStart +
+                replacement.length,
+        )
+    }
+
+    function applyBulletList() {
+        const range = getSelectedLineRange()
+
+        if (!range) {
+            return
+        }
+
+        const lines =
+            range.text.split('\n')
+
+        const replacement =
+            lines
+                .map((line) => {
+                    const content =
+                        line.replace(
+                            /^\s*(?:[-*+]\s+(?:\[[ xX]\]\s*)?|\d+\.\s+|>\s+)/,
+                            '',
+                        )
+
+                    return `- ${content}`
+                })
+                .join('\n')
+
+        replaceEditorText(
+            range.lineStart,
+            range.lineEnd,
+            replacement,
+            range.lineStart,
+            range.lineStart +
+                replacement.length,
+        )
+    }
+
+    function applyOrderedList() {
+        const range = getSelectedLineRange()
+
+        if (!range) {
+            return
+        }
+
+        const lines =
+            range.text.split('\n')
+
+        const replacement =
+            lines
+                .map((line, index) => {
+                    const content =
+                        line.replace(
+                            /^\s*(?:[-*+]\s+(?:\[[ xX]\]\s*)?|\d+\.\s+|>\s+)/,
+                            '',
+                        )
+
+                    return `${index + 1}. ${content}`
+                })
+                .join('\n')
+
+        replaceEditorText(
+            range.lineStart,
+            range.lineEnd,
+            replacement,
+            range.lineStart,
+            range.lineStart +
+                replacement.length,
+        )
+    }
+
+    function applyChecklist() {
+        const range = getSelectedLineRange()
+
+        if (!range) {
+            return
+        }
+
+        const lines =
+            range.text.split('\n')
+
+        const hasChecklist =
+            lines.length > 0 &&
+            lines.every((line) =>
+                /^\s*[-*+]\s+\[[ xX]\]\s+/.test(
+                    line,
+                ),
+            )
+
+        const replacement =
+            lines
+                .map((line) => {
+                    const checklistMatch =
+                        line.match(
+                            /^\s*[-*+]\s+\[([ xX])\]\s*(.*)$/,
+                        )
+
+                    if (checklistMatch) {
+                        const checked =
+                            checklistMatch[1]
+                                .toLowerCase() ===
+                            'x'
+
+                        if (hasChecklist) {
+                            return (
+                                checked
+                                    ? '- [ ] '
+                                    : '- [x] '
+                            ) +
+                                checklistMatch[2]
+                        }
+
+                        return (
+                            `- [${checked ? 'x' : ' '}] ` +
+                            checklistMatch[2]
+                        )
+                    }
+
+                    const content =
+                        line.replace(
+                            /^\s*(?:[-*+]\s+|\d+\.\s+|>\s+)/,
+                            '',
+                        )
+
+                    return `- [ ] ${content}`
+                })
+                .join('\n')
+
+        replaceEditorText(
+            range.lineStart,
+            range.lineEnd,
+            replacement,
+            range.lineStart,
+            range.lineStart +
+                replacement.length,
+        )
+    }
+
+    function applyBlockquote() {
+        const range = getSelectedLineRange()
+
+        if (!range) {
+            return
+        }
+
+        const lines =
+            range.text.split('\n')
+
+        const allQuoted =
+            lines.every((line) =>
+                /^\s*>\s?/.test(line),
+            )
+
+        const replacement =
+            lines
+                .map((line) => {
+                    if (allQuoted) {
+                        return line.replace(
+                            /^\s*>\s?/,
+                            '',
+                        )
+                    }
+
+                    return `> ${line}`
+                })
+                .join('\n')
+
+        replaceEditorText(
+            range.lineStart,
+            range.lineEnd,
+            replacement,
+            range.lineStart,
+            range.lineStart +
+                replacement.length,
+        )
+    }
+
+    function insertLink() {
+        const textarea = getEditorElement()
+
+        if (!textarea) {
+            return
+        }
+
+        const start = textarea.selectionStart
+        const end = textarea.selectionEnd
+
+        const selectedText =
+            editedMarkdown.value.slice(
+                start,
+                end,
+            )
+
+        const label =
+            selectedText || 'link text'
+
+        const replacement =
+            `[${label}](https://)`
+
+        const labelStart =
+            start + 1
+
+        const labelEnd =
+            labelStart + label.length
+
+        replaceEditorText(
+            start,
+            end,
+            replacement,
+            labelStart,
+            labelEnd,
+        )
+    }
+
+    function insertImage() {
+        const textarea = getEditorElement()
+
+        if (!textarea) {
+            return
+        }
+
+        const start = textarea.selectionStart
+        const end = textarea.selectionEnd
+
+        const selectedText =
+            editedMarkdown.value.slice(
+                start,
+                end,
+            )
+
+        const altText =
+            selectedText || 'image'
+
+        const replacement =
+            `![${altText}](path/to/image.png)`
+
+        const altStart =
+            start + 2
+
+        const altEnd =
+            altStart + altText.length
+
+        replaceEditorText(
+            start,
+            end,
+            replacement,
+            altStart,
+            altEnd,
+        )
+    }
+
+    function applyCodeBlock() {
+        const textarea = getEditorElement()
+
+        if (!textarea) {
+            return
+        }
+
+        const start = textarea.selectionStart
+        const end = textarea.selectionEnd
+
+        const selectedText =
+            editedMarkdown.value.slice(
+                start,
+                end,
+            )
+
+        const language =
+            selectedCodeLanguage.value
+
+        const openingFence =
+            language
+                ? `\`\`\`${language}`
+                : '```'
+
+        if (selectedText) {
+            const replacement =
+                `${openingFence}\n` +
+                `${selectedText}\n` +
+                '```'
+
+            replaceEditorText(
+                start,
+                end,
+                replacement,
+                start,
+                start + replacement.length,
+            )
+
+            return
+        }
+
+        const placeholder =
+            'code'
+
+        const replacement =
+            `${openingFence}\n` +
+            `${placeholder}\n` +
+            '```'
 
         const placeholderStart =
-            start + prefix.length
+            start +
+            openingFence.length +
+            1
 
         const placeholderEnd =
             placeholderStart +
@@ -2087,987 +3344,585 @@ function applyInlineFormatting(
             placeholderStart,
             placeholderEnd,
         )
-
-        return
     }
 
-    /*
-     * Normal selection.
-     */
-    const replacement =
-        prefix +
-        selectedText +
-        suffix
+    function insertHorizontalRule() {
+        const textarea = getEditorElement()
+
+        if (!textarea) {
+            return
+        }
+
+        const start = textarea.selectionStart
+        const end = textarea.selectionEnd
+
+        const before =
+            editedMarkdown.value.slice(
+                0,
+                start,
+            )
+
+        const after =
+            editedMarkdown.value.slice(
+                end,
+            )
+
+        const prefix =
+            before.length > 0 &&
+            !before.endsWith('\n\n')
+                ? '\n\n'
+                : ''
+
+        const suffix =
+            after.length > 0 &&
+            !after.startsWith('\n\n')
+                ? '\n\n'
+                : ''
 
-    replaceEditorText(
-        start,
-        end,
-        replacement,
-        start,
-        start + replacement.length,
-    )
-}
-
-/*
- * Get the beginning and end of the lines
- * affected by the current selection.
- */
-function getSelectedLineRange() {
-    const textarea = getEditorElement()
-
-    if (!textarea) {
-        return null
-    }
-
-    const value = editedMarkdown.value
-    const start = textarea.selectionStart
-    const end = textarea.selectionEnd
-
-    const lineStart =
-        value.lastIndexOf(
-            '\n',
-            Math.max(0, start - 1),
-        ) + 1
-
-    let lineEnd =
-        value.indexOf(
-            '\n',
-            end,
-        )
-
-    if (lineEnd === -1) {
-        lineEnd = value.length
-    }
-
-    return {
-        start,
-        end,
-        lineStart,
-        lineEnd,
-        text: value.slice(
-            lineStart,
-            lineEnd,
-        ),
-    }
-}
-
-/*
- * Apply a Markdown heading prefix.
- */
-function applyLinePrefix(prefix) {
-    const range = getSelectedLineRange()
-
-    if (!range) {
-        return
-    }
-
-    const lines =
-        range.text.split('\n')
-
-    const replacement =
-        lines
-            .map((line) => {
-                const content =
-                    line.replace(
-                        /^#{1,6}\s+/,
-                        '',
-                    )
-
-                if (!content.trim()) {
-                    return prefix.trimEnd()
-                }
-
-                return prefix + content
-            })
-            .join('\n')
-
-    replaceEditorText(
-        range.lineStart,
-        range.lineEnd,
-        replacement,
-        range.lineStart,
-        range.lineStart +
-            replacement.length,
-    )
-}
-
-/*
- * Apply a bullet list.
- */
-function applyBulletList() {
-    const range = getSelectedLineRange()
-
-    if (!range) {
-        return
-    }
-
-    const lines =
-        range.text.split('\n')
-
-    const replacement =
-        lines
-            .map((line) => {
-                const content =
-                    line.replace(
-                        /^\s*(?:[-*+]\s+(?:\[[ xX]\]\s*)?|\d+\.\s+|>\s+)/,
-                        '',
-                    )
-
-                return `- ${content}`
-            })
-            .join('\n')
-
-    replaceEditorText(
-        range.lineStart,
-        range.lineEnd,
-        replacement,
-        range.lineStart,
-        range.lineStart +
-            replacement.length,
-    )
-}
-
-/*
- * Apply an ordered list.
- */
-function applyOrderedList() {
-    const range = getSelectedLineRange()
-
-    if (!range) {
-        return
-    }
-
-    const lines =
-        range.text.split('\n')
-
-    const replacement =
-        lines
-            .map((line, index) => {
-                const content =
-                    line.replace(
-                        /^\s*(?:[-*+]\s+(?:\[[ xX]\]\s*)?|\d+\.\s+|>\s+)/,
-                        '',
-                    )
-
-                return `${index + 1}. ${content}`
-            })
-            .join('\n')
-
-    replaceEditorText(
-        range.lineStart,
-        range.lineEnd,
-        replacement,
-        range.lineStart,
-        range.lineStart +
-            replacement.length,
-    )
-}
-
-/*
- * Apply a checklist.
- */
-function applyChecklist() {
-    const range = getSelectedLineRange()
-
-    if (!range) {
-        return
-    }
-
-    const lines =
-        range.text.split('\n')
-
-    const hasChecklist =
-        lines.length > 0 &&
-        lines.every((line) =>
-            /^\s*[-*+]\s+\[[ xX]\]\s+/.test(
-                line,
-            ),
-        )
-
-    const replacement =
-        lines
-            .map((line) => {
-                const checklistMatch =
-                    line.match(
-                        /^\s*[-*+]\s+\[([ xX])\]\s*(.*)$/,
-                    )
-
-                if (checklistMatch) {
-                    const checked =
-                        checklistMatch[1]
-                            .toLowerCase() ===
-                        'x'
-
-                    if (hasChecklist) {
-                        return (
-                            checked
-                                ? '- [ ] '
-                                : '- [x] '
-                        ) +
-                            checklistMatch[2]
-                    }
-
-                    return (
-                        `- [${checked ? 'x' : ' '}] ` +
-                        checklistMatch[2]
-                    )
-                }
-
-                const content =
-                    line.replace(
-                        /^\s*(?:[-*+]\s+|\d+\.\s+|>\s+)/,
-                        '',
-                    )
-
-                return `- [ ] ${content}`
-            })
-            .join('\n')
-
-    replaceEditorText(
-        range.lineStart,
-        range.lineEnd,
-        replacement,
-        range.lineStart,
-        range.lineStart +
-            replacement.length,
-    )
-}
-
-/*
- * Apply a blockquote.
- */
-function applyBlockquote() {
-    const range = getSelectedLineRange()
-
-    if (!range) {
-        return
-    }
-
-    const lines =
-        range.text.split('\n')
-
-    const allQuoted =
-        lines.every((line) =>
-            /^\s*>\s?/.test(line),
-        )
-
-    const replacement =
-        lines
-            .map((line) => {
-                if (allQuoted) {
-                    return line.replace(
-                        /^\s*>\s?/,
-                        '',
-                    )
-                }
-
-                return `> ${line}`
-            })
-            .join('\n')
-
-    replaceEditorText(
-        range.lineStart,
-        range.lineEnd,
-        replacement,
-        range.lineStart,
-        range.lineStart +
-            replacement.length,
-    )
-}
-
-/*
- * Insert a Markdown link.
- */
-function insertLink() {
-    const textarea = getEditorElement()
-
-    if (!textarea) {
-        return
-    }
-
-    const start = textarea.selectionStart
-    const end = textarea.selectionEnd
-
-    const selectedText =
-        editedMarkdown.value.slice(
-            start,
-            end,
-        )
-
-    const label =
-        selectedText || 'link text'
-
-    const replacement =
-        `[${label}](https://)`
-
-    const labelStart =
-        start + 1
-
-    const labelEnd =
-        labelStart + label.length
-
-    replaceEditorText(
-        start,
-        end,
-        replacement,
-        labelStart,
-        labelEnd,
-    )
-}
-
-/*
- * Insert a Markdown image.
- */
-function insertImage() {
-    const textarea = getEditorElement()
-
-    if (!textarea) {
-        return
-    }
-
-    const start = textarea.selectionStart
-    const end = textarea.selectionEnd
-
-    const selectedText =
-        editedMarkdown.value.slice(
-            start,
-            end,
-        )
-
-    const altText =
-        selectedText || 'image'
-
-    const replacement =
-        `![${altText}](path/to/image.png)`
-
-    const altStart =
-        start + 2
-
-    const altEnd =
-        altStart + altText.length
-
-    replaceEditorText(
-        start,
-        end,
-        replacement,
-        altStart,
-        altEnd,
-    )
-}
-
-/*
- * Insert a fenced Markdown code block.
- */
-function applyCodeBlock() {
-    const textarea = getEditorElement()
-
-    if (!textarea) {
-        return
-    }
-
-    const start = textarea.selectionStart
-    const end = textarea.selectionEnd
-
-    const selectedText =
-        editedMarkdown.value.slice(
-            start,
-            end,
-        )
-
-    const language =
-        selectedCodeLanguage.value
-
-    const openingFence =
-        language
-            ? `\`\`\`${language}`
-            : '```'
-
-    if (selectedText) {
         const replacement =
-            `${openingFence}\n` +
-            `${selectedText}\n` +
-            '```'
+            prefix +
+            '---' +
+            suffix
+
+        const cursor =
+            start + replacement.length
 
         replaceEditorText(
             start,
             end,
             replacement,
-            start,
-            start + replacement.length,
+            cursor,
+            cursor,
         )
-
-        return
     }
 
-    const placeholder =
-        'code'
+    function handleEditorKeydown(event) {
+        const modifier =
+            event.ctrlKey ||
+            event.metaKey
 
-    const replacement =
-        `${openingFence}\n` +
-        `${placeholder}\n` +
-        '```'
+        if (
+            modifier &&
+            event.key.toLowerCase() === 's'
+        ) {
+            event.preventDefault()
+            saveFile()
 
-    const placeholderStart =
-        start +
-        openingFence.length +
-        1
+            return
+        }
 
-    const placeholderEnd =
-        placeholderStart +
-        placeholder.length
+        if (
+            modifier &&
+            !event.shiftKey &&
+            event.key.toLowerCase() === 'b'
+        ) {
+            event.preventDefault()
 
-    replaceEditorText(
-        start,
-        end,
-        replacement,
-        placeholderStart,
-        placeholderEnd,
-    )
-}
+            applyInlineFormatting(
+                '**',
+                '**',
+            )
 
-/*
- * Insert a horizontal rule.
- */
-function insertHorizontalRule() {
-    const textarea = getEditorElement()
+            return
+        }
 
-    if (!textarea) {
-        return
+        if (
+            modifier &&
+            !event.shiftKey &&
+            event.key.toLowerCase() === 'i'
+        ) {
+            event.preventDefault()
+
+            applyInlineFormatting(
+                '*',
+                '*',
+            )
+
+            return
+        }
+
+        if (
+            modifier &&
+            !event.shiftKey &&
+            event.key.toLowerCase() === 'k'
+        ) {
+            event.preventDefault()
+
+            insertLink()
+        }
     }
 
-    const start = textarea.selectionStart
-    const end = textarea.selectionEnd
+    async function saveFile() {
+        if (
+            !selectedFile.value ||
+            savingFile.value ||
+            !isDirty.value
+        ) {
+            return
+        }
 
-    const before =
-        editedMarkdown.value.slice(
-            0,
-            start,
-        )
+        savingFile.value = true
+        saveError.value = ''
 
-    const after =
-        editedMarkdown.value.slice(
-            end,
-        )
+        try {
+            const body =
+                new URLSearchParams()
 
-    const prefix =
-        before.length > 0 &&
-        !before.endsWith('\n\n')
-            ? '\n\n'
-            : ''
+            body.set(
+                'path',
+                selectedFile.value,
+            )
 
-    const suffix =
-        after.length > 0 &&
-        !after.startsWith('\n\n')
-            ? '\n\n'
-            : ''
+            body.set(
+                'content',
+                editedMarkdown.value,
+            )
 
-    const replacement =
-        prefix +
-        '---' +
-        suffix
-
-    const cursor =
-        start + replacement.length
-
-    replaceEditorText(
-        start,
-        end,
-        replacement,
-        cursor,
-        cursor,
-    )
-}
-
-/*
- * Keyboard shortcuts for the editor.
- */
-function handleEditorKeydown(event) {
-    const modifier =
-        event.ctrlKey ||
-        event.metaKey
-
-    if (
-        modifier &&
-        event.key.toLowerCase() === 's'
-    ) {
-        event.preventDefault()
-        saveFile()
-
-        return
-    }
-
-    if (
-        modifier &&
-        !event.shiftKey &&
-        event.key.toLowerCase() === 'b'
-    ) {
-        event.preventDefault()
-
-        applyInlineFormatting(
-            '**',
-            '**',
-        )
-
-        return
-    }
-
-    if (
-        modifier &&
-        !event.shiftKey &&
-        event.key.toLowerCase() === 'i'
-    ) {
-        event.preventDefault()
-
-        applyInlineFormatting(
-            '*',
-            '*',
-        )
-
-        return
-    }
-
-    if (
-        modifier &&
-        !event.shiftKey &&
-        event.key.toLowerCase() === 'k'
-    ) {
-        event.preventDefault()
-
-        insertLink()
-    }
-}
-
-/*
- * Save the current Markdown file.
- */
-async function saveFile() {
-    if (
-        !selectedFile.value ||
-        savingFile.value ||
-        !isDirty.value
-    ) {
-        return
-    }
-
-    savingFile.value = true
-    saveError.value = ''
-
-    try {
-        const body =
-            new URLSearchParams()
-
-        body.set(
-            'path',
-            selectedFile.value,
-        )
-
-        body.set(
-            'content',
-            editedMarkdown.value,
-        )
-
-        const response = await fetch(
-            OC.generateUrl(
-                '/apps/markdown_wiki/api/save-file',
-            ),
-            {
-                method: 'POST',
-                headers: {
-                    Accept: 'application/json',
-                    'Content-Type':
-                        'application/x-www-form-urlencoded;charset=UTF-8',
+            const response = await fetch(
+                OC.generateUrl(
+                    '/apps/markdown_wiki/api/save-file',
+                ),
+                {
+                    method: 'POST',
+                    headers: {
+                        Accept: 'application/json',
+                        'Content-Type':
+                            'application/x-www-form-urlencoded;charset=UTF-8',
+                    },
+                    body,
                 },
-                body,
-            },
+            )
+
+            const data =
+                await response.json()
+
+            if (!response.ok) {
+                throw new Error(
+                    data.message ||
+                        'Failed to save Markdown file.',
+                )
+            }
+
+            markdown.value =
+                editedMarkdown.value
+
+            editedMarkdown.value =
+                markdown.value
+
+            saveError.value = ''
+            selectedCodeLanguage.value = ''
+        } catch (err) {
+            saveError.value =
+                err.message ||
+                'Failed to save Markdown file.'
+        } finally {
+            savingFile.value = false
+        }
+    }
+
+    function handleBeforeUnload(event) {
+        if (!isDirty.value) {
+            return
+        }
+
+        event.preventDefault()
+        event.returnValue = ''
+    }
+
+    function getResourceRelativePath(path) {
+        const normalizedPath =
+            normalizePath(path)
+
+        const root =
+            normalizePath(
+                wikiRoot.value,
+            )
+
+        if (
+            normalizedPath === root
+        ) {
+            return '.'
+        }
+
+        if (
+            normalizedPath.startsWith(
+                root + '/',
+            )
+        ) {
+            return normalizedPath
+                .slice(root.length + 1)
+        }
+
+        return normalizedPath
+    }
+
+    function getRelativePath(
+        fromDirectory,
+        targetPath,
+    ) {
+        const fromParts =
+            normalizePath(
+                fromDirectory,
+            )
+                .split('/')
+                .filter(Boolean)
+
+        const targetParts =
+            normalizePath(
+                targetPath,
+            )
+                .split('/')
+                .filter(Boolean)
+
+        let commonLength = 0
+
+        while (
+            commonLength <
+                fromParts.length &&
+            commonLength <
+                targetParts.length &&
+            fromParts[commonLength] ===
+                targetParts[commonLength]
+        ) {
+            commonLength++
+        }
+
+        const upCount =
+            fromParts.length -
+            commonLength
+
+        const relativeParts = []
+
+        for (
+            let index = 0;
+            index < upCount;
+            index++
+        ) {
+            relativeParts.push('..')
+        }
+
+        relativeParts.push(
+            ...targetParts.slice(
+                commonLength,
+            ),
         )
 
-        const data =
-            await response.json()
+        return (
+            relativeParts.join('/') ||
+            '.'
+        )
+    }
 
-        if (!response.ok) {
-            throw new Error(
-                data.message ||
-                    'Failed to save Markdown file.',
+    function getResourceCopyPath(path) {
+        if (selectedFile.value) {
+            return getRelativePath(
+                getParentPath(
+                    selectedFile.value,
+                ),
+                path,
             )
         }
 
-        markdown.value =
-            editedMarkdown.value
-
-        editedMarkdown.value =
-            markdown.value
-
-        editing.value = false
-
-        saveError.value = ''
-        selectedCodeLanguage.value = ''
-    } catch (err) {
-        saveError.value =
-            err.message ||
-            'Failed to save Markdown file.'
-    } finally {
-        savingFile.value = false
-    }
-}
-
-/*
- * Warn the browser before leaving the application
- * while there are unsaved changes.
- */
-function handleBeforeUnload(event) {
-    if (!isDirty.value) {
-        return
-    }
-
-    event.preventDefault()
-    event.returnValue = ''
-}
-
-/*
- * Get the path of a resource relative to
- * the configured Wiki Root.
- */
-function getResourceRelativePath(path) {
-    const normalizedPath =
-        normalizePath(path)
-
-    const root =
-        normalizePath(
-            wikiRoot.value,
-        )
-
-    if (
-        normalizedPath === root
-    ) {
-        return '.'
-    }
-
-    if (
-        normalizedPath.startsWith(
-            root + '/',
-        )
-    ) {
-        return normalizedPath
-            .slice(root.length + 1)
-    }
-
-    return normalizedPath
-}
-
-/*
- * Calculate a relative path from the directory
- * containing the currently opened Markdown file
- * to another file in the Wiki Root.
- */
-function getRelativePath(
-    fromDirectory,
-    targetPath,
-) {
-    const fromParts =
-        normalizePath(
-            fromDirectory,
-        )
-            .split('/')
-            .filter(Boolean)
-
-    const targetParts =
-        normalizePath(
-            targetPath,
-        )
-            .split('/')
-            .filter(Boolean)
-
-    let commonLength = 0
-
-    while (
-        commonLength <
-            fromParts.length &&
-        commonLength <
-            targetParts.length &&
-        fromParts[commonLength] ===
-            targetParts[commonLength]
-    ) {
-        commonLength++
-    }
-
-    const upCount =
-        fromParts.length -
-        commonLength
-
-    const relativeParts = []
-
-    for (
-        let index = 0;
-        index < upCount;
-        index++
-    ) {
-        relativeParts.push('..')
-    }
-
-    relativeParts.push(
-        ...targetParts.slice(
-            commonLength,
-        ),
-    )
-
-    return (
-        relativeParts.join('/') ||
-        '.'
-    )
-}
-
-/*
- * Get the most useful relative path for a
- * resource selected while editing/reading a
- * Markdown document.
- */
-function getResourceCopyPath(path) {
-    if (selectedFile.value) {
-        return getRelativePath(
-            getParentPath(
-                selectedFile.value,
-            ),
+        return getResourceRelativePath(
             path,
         )
     }
 
-    return getResourceRelativePath(
+    async function copyResourceRelativePath(
         path,
-    )
-}
+    ) {
+        copyError.value = ''
+        copiedResourcePath.value = false
 
-async function copyResourceRelativePath(
-    path,
-) {
-    copyError.value = ''
-    copiedResourcePath.value = false
+        const relativePath =
+            getResourceCopyPath(path)
 
-    const relativePath =
-        getResourceCopyPath(path)
+        try {
+            await navigator.clipboard.writeText(
+                relativePath,
+            )
 
-    try {
-        await navigator.clipboard.writeText(
-            relativePath,
-        )
+            copiedResourcePath.value = true
 
-        copiedResourcePath.value = true
-
-        window.setTimeout(() => {
-            copiedResourcePath.value = false
-        }, 1800)
-    } catch (err) {
-        copyError.value =
-            'Failed to copy path.'
-    }
-}
-
-/*
- * Resolve a relative path from the directory
- * containing the currently opened Markdown file.
- */
-function resolveRelativePath(path) {
-    if (!selectedFile.value) {
-        return null
+            window.setTimeout(() => {
+                copiedResourcePath.value = false
+            }, 1800)
+        } catch (err) {
+            copyError.value =
+                'Failed to copy path.'
+        }
     }
 
-    const currentDirectory =
-        getParentPath(
-            selectedFile.value,
-        )
-
-    const resolvedParts =
-        currentDirectory
-            .split('/')
-            .filter(Boolean)
-
-    const linkParts =
-        path.split('/')
-
-    for (const part of linkParts) {
-        if (
-            !part ||
-            part === '.'
-        ) {
-            continue
+    function resolveRelativePath(path) {
+        if (!selectedFile.value) {
+            return null
         }
 
-        if (part === '..') {
-            if (resolvedParts.length > 0) {
-                resolvedParts.pop()
+        const currentDirectory =
+            getParentPath(
+                selectedFile.value,
+            )
+
+        const resolvedParts =
+            currentDirectory
+                .split('/')
+                .filter(Boolean)
+
+        const linkParts =
+            path.split('/')
+
+        for (const part of linkParts) {
+            if (
+                !part ||
+                part === '.'
+            ) {
+                continue
             }
 
-            continue
+            if (part === '..') {
+                if (resolvedParts.length > 0) {
+                    resolvedParts.pop()
+                }
+
+                continue
+            }
+
+            resolvedParts.push(part)
         }
 
-        resolvedParts.push(part)
+        return '/' +
+            resolvedParts.join('/')
     }
 
-    return '/' +
-        resolvedParts.join('/')
-}
+    function isInsideWikiRoot(path) {
+        const normalizedPath =
+            normalizePath(path)
 
-/*
- * Check whether a path belongs to the configured
- * Wiki Root.
- */
-function isInsideWikiRoot(path) {
-    const normalizedPath =
-        normalizePath(path)
-
-    const root =
-        normalizePath(
-            wikiRoot.value,
-        )
-
-    return (
-        normalizedPath === root ||
-        normalizedPath.startsWith(
-            root + '/',
-        )
-    )
-}
-
-/*
- * Build an authenticated Nextcloud WebDAV URL
- * for a file inside the user's Wiki Root.
- */
-function buildDavUrl(path) {
-    if (
-        !path ||
-        !OC.currentUser
-    ) {
-        return null
-    }
-
-    const normalizedPath =
-        normalizePath(path)
-
-    if (
-        !isInsideWikiRoot(
-            normalizedPath,
-        )
-    ) {
-        return null
-    }
-
-    const encodedPath =
-        normalizedPath
-            .split('/')
-            .filter(Boolean)
-            .map((part) =>
-                encodeURIComponent(
-                    part,
-                ),
+        const root =
+            normalizePath(
+                wikiRoot.value,
             )
-            .join('/')
 
-    return (
-        OC.generateUrl(
-            '/remote.php/dav/files/' +
-                encodeURIComponent(
-                    OC.currentUser,
-                ),
-        ) +
-        '/' +
-        encodedPath
-    )
-}
-
-/*
- * Resolve relative Markdown images.
- */
-function resolveMarkdownImages(html) {
-    if (!html) {
-        return html
+        return (
+            normalizedPath === root ||
+            normalizedPath.startsWith(
+                root + '/',
+            )
+        )
     }
 
-    const parser =
-        new DOMParser()
+    function buildDavUrl(path) {
+        if (
+            !path ||
+            !OC.currentUser
+        ) {
+            return null
+        }
 
-    const document =
-        parser.parseFromString(
-            html,
-            'text/html',
+        const normalizedPath =
+            normalizePath(path)
+
+        if (
+            !isInsideWikiRoot(
+                normalizedPath,
+            )
+        ) {
+            return null
+        }
+
+        const encodedPath =
+            normalizedPath
+                .split('/')
+                .filter(Boolean)
+                .map((part) =>
+                    encodeURIComponent(
+                        part,
+                    ),
+                )
+                .join('/')
+
+        return (
+            OC.generateUrl(
+                '/remote.php/dav/files/' +
+                    encodeURIComponent(
+                        OC.currentUser,
+                    ),
+            ) +
+            '/' +
+            encodedPath
         )
+    }
 
-    const images =
-        document.querySelectorAll(
-            'img',
-        )
+    function resolveMarkdownImages(html) {
+        if (!html) {
+            return html
+        }
 
-    images.forEach((image) => {
-        const source =
-            image.getAttribute(
+        const parser =
+            new DOMParser()
+
+        const document =
+            parser.parseFromString(
+                html,
+                'text/html',
+            )
+
+        const images =
+            document.querySelectorAll(
+                'img',
+            )
+
+        images.forEach((image) => {
+            const source =
+                image.getAttribute(
+                    'src',
+                )
+
+            if (!source) {
+                return
+            }
+
+            if (
+                source.startsWith(
+                    'http://',
+                ) ||
+                source.startsWith(
+                    'https://',
+                ) ||
+                source.startsWith(
+                    'data:',
+                ) ||
+                source.startsWith(
+                    'blob:',
+                )
+            ) {
+                return
+            }
+
+            if (
+                source.startsWith('//')
+            ) {
+                return
+            }
+
+            const match =
+                source.match(
+                    /^([^?#]*)([?#].*)?$/,
+                )
+
+            const sourcePath =
+                match
+                    ? match[1]
+                    : source
+
+            const suffix =
+                match && match[2]
+                    ? match[2]
+                    : ''
+
+            let resolvedPath
+
+            if (
+                sourcePath.startsWith('/')
+            ) {
+                const root =
+                    normalizePath(
+                        wikiRoot.value,
+                    )
+
+                resolvedPath =
+                    normalizePath(
+                        root +
+                            '/' +
+                            sourcePath
+                                .split('/')
+                                .filter(Boolean)
+                                .join('/'),
+                    )
+            } else {
+                resolvedPath =
+                    resolveRelativePath(
+                        sourcePath,
+                    )
+            }
+
+            if (
+                !resolvedPath ||
+                !isInsideWikiRoot(
+                    resolvedPath,
+                )
+            ) {
+                return
+            }
+
+            const davUrl =
+                buildDavUrl(
+                    resolvedPath,
+                )
+
+            if (!davUrl) {
+                return
+            }
+
+            image.setAttribute(
                 'src',
+                davUrl + suffix,
             )
 
-        if (!source) {
+            image.setAttribute(
+                'loading',
+                'lazy',
+            )
+
+            image.setAttribute(
+                'decoding',
+                'async',
+            )
+        })
+
+        return document.body.innerHTML
+    }
+
+    function handleMarkdownClick(event) {
+        const link =
+            event.target.closest('a')
+
+        if (!link) {
+            return
+        }
+
+        const href =
+            link.getAttribute('href')
+
+        if (!href) {
             return
         }
 
         if (
-            source.startsWith(
-                'http://',
-            ) ||
-            source.startsWith(
-                'https://',
-            ) ||
-            source.startsWith(
-                'data:',
-            ) ||
-            source.startsWith(
-                'blob:',
-            )
+            href.startsWith('http://') ||
+            href.startsWith('https://') ||
+            href.startsWith('#') ||
+            href.startsWith('mailto:')
         ) {
             return
         }
 
         if (
-            source.startsWith('//')
+            !href.toLowerCase().endsWith('.md')
         ) {
             return
         }
 
-        const match =
-            source.match(
-                /^([^?#]*)([?#].*)?$/,
-            )
+        event.preventDefault()
 
-        const sourcePath =
-            match
-                ? match[1]
-                : source
-
-        const suffix =
-            match && match[2]
-                ? match[2]
-                : ''
-
-        let resolvedPath
-
-        if (
-            sourcePath.startsWith('/')
-        ) {
-            const root =
-                normalizePath(
-                    wikiRoot.value,
-                )
-
-            resolvedPath =
-                normalizePath(
-                    root +
-                        '/' +
-                        sourcePath
-                            .split('/')
-                            .filter(Boolean)
-                            .join('/'),
-                )
-        } else {
-            resolvedPath =
-                resolveRelativePath(
-                    sourcePath,
-                )
+        if (!selectedFile.value) {
+            return
         }
+
+        const resolvedPath =
+            resolveRelativePath(
+                href,
+            )
 
         if (
             !resolvedPath ||
@@ -3078,887 +3933,1048 @@ function resolveMarkdownImages(html) {
             return
         }
 
-        const davUrl =
-            buildDavUrl(
-                resolvedPath,
+        openFile(resolvedPath)
+    }
+
+    function renderMarkdown(content) {
+        if (!content) {
+            return ''
+        }
+
+        const renderer = new marked.Renderer()
+
+        renderer.code = ({
+            text,
+            lang,
+        }) => {
+            const language =
+                lang
+                    ? lang
+                        .trim()
+                        .split(/\s+/)[0]
+                        .toLowerCase()
+                    : ''
+
+            let highlightedCode
+
+            if (
+                language &&
+                hljs.getLanguage(language)
+            ) {
+                highlightedCode =
+                    hljs.highlight(
+                        text,
+                        {
+                            language,
+                            ignoreIllegals: true,
+                        },
+                    ).value
+            } else {
+                highlightedCode =
+                    hljs.highlightAuto(
+                        text,
+                    ).value
+            }
+
+            const languageClass =
+                language
+                    ? ` language-${language}`
+                    : ''
+
+            return (
+                `<pre><code class="hljs${languageClass}">` +
+                highlightedCode +
+                '</code></pre>'
+            )
+        }
+
+        const html =
+            marked.parse(
+                content,
+                {
+                    renderer,
+                },
             )
 
-        if (!davUrl) {
+        const htmlWithImages =
+            resolveMarkdownImages(
+                html,
+            )
+
+        return DOMPurify.sanitize(
+            htmlWithImages,
+        )
+    }
+
+    async function chooseWikiRoot() {
+        if (!confirmDiscardChanges()) {
             return
         }
 
-        image.setAttribute(
-            'src',
-            davUrl + suffix,
-        )
+        error.value = ''
 
-        image.setAttribute(
-            'loading',
-            'lazy',
-        )
+        try {
+            const picker = getFilePickerBuilder(
+                'Choose Wiki Root',
+            )
+                .setMultiSelect(false)
+                .allowDirectories(true)
+                .addButton({
+                    label: 'Select folder',
+                    variant: 'primary',
+                    callback: (nodes) => {
+                        return nodes
+                    },
+                })
+                .build()
 
-        image.setAttribute(
-            'decoding',
-            'async',
+            const paths = await picker.pick()
+
+            if (
+                !paths ||
+                (
+                    Array.isArray(paths) &&
+                    paths.length === 0
+                )
+            ) {
+                return
+            }
+
+            const selectedPath =
+                normalizePath(
+                    Array.isArray(paths)
+                        ? paths[0]
+                        : paths,
+                )
+
+            const body = new URLSearchParams()
+
+            body.set(
+                'wikiRoot',
+                selectedPath,
+            )
+
+            const response = await fetch(
+                OC.generateUrl(
+                    '/apps/markdown_wiki/api/wiki-root',
+                ),
+                {
+                    method: 'POST',
+                    headers: {
+                        Accept: 'application/json',
+                    },
+                    body,
+                },
+            )
+
+            const data =
+                await response.json()
+
+            if (!response.ok) {
+                throw new Error(
+                    data.message ||
+                        'Failed to save Wiki Root.',
+                )
+            }
+
+            stopEditing()
+
+            wikiRoot.value =
+                data.wikiRoot || ''
+
+            selectedFile.value = ''
+            selectedResource.value = null
+            markdown.value = ''
+            editedMarkdown.value = ''
+            fileError.value = ''
+            currentFolder.value = ''
+            saveError.value = ''
+            copyError.value = ''
+            copiedResourcePath.value = false
+            createError.value = ''
+            createMenuVisible.value = false
+            createDialogVisible.value = false
+            createDialogName.value = ''
+            createDialogFolder.value = ''
+            createDialogError.value = ''
+
+            clearSearch()
+
+            expandedFolders.value = new Set()
+            createDialogExpandedFolders.value =
+                new Set()
+            tree.value = []
+
+            if (wikiRoot.value) {
+                await loadRootTree()
+            }
+        } catch (err) {
+            error.value =
+                err.message ||
+                'Failed to choose Wiki Root.'
+        }
+    }
+
+    async function loadWikiRoot() {
+        error.value = ''
+
+        try {
+            const response = await fetch(
+                OC.generateUrl(
+                    '/apps/markdown_wiki/api/wiki-root',
+                ),
+                {
+                    method: 'GET',
+                    headers: {
+                        Accept: 'application/json',
+                    },
+                },
+            )
+
+            const data =
+                await response.json()
+
+            if (!response.ok) {
+                throw new Error(
+                    data.message ||
+                        'Failed to load Wiki Root.',
+                )
+            }
+
+            wikiRoot.value =
+                data.wikiRoot || ''
+
+            if (wikiRoot.value) {
+                await loadRootTree()
+            }
+        } catch (err) {
+            error.value =
+                err.message
+        }
+    }
+
+    const wikiRootName = computed(() => {
+        if (!wikiRoot.value) {
+            return 'Wiki Root'
+        }
+
+        return getNameFromPath(
+            wikiRoot.value,
         )
     })
 
-    return document.body.innerHTML
-}
-
-/*
- * Resolve relative Markdown links inside the Wiki.
- */
-function handleMarkdownClick(event) {
-    const link =
-        event.target.closest('a')
-
-    if (!link) {
-        return
-    }
-
-    const href =
-        link.getAttribute('href')
-
-    if (!href) {
-        return
-    }
-
-    if (
-        href.startsWith('http://') ||
-        href.startsWith('https://') ||
-        href.startsWith('#') ||
-        href.startsWith('mailto:')
-    ) {
-        return
-    }
-
-    if (
-        !href.toLowerCase().endsWith('.md')
-    ) {
-        return
-    }
-
-    event.preventDefault()
-
-    if (!selectedFile.value) {
-        return
-    }
-
-    const resolvedPath =
-        resolveRelativePath(
-            href,
-        )
-
-    if (
-        !resolvedPath ||
-        !isInsideWikiRoot(
-            resolvedPath,
-        )
-    ) {
-        return
-    }
-
-    openFile(resolvedPath)
-}
-
-/*
- * Render arbitrary Markdown content.
- */
-function renderMarkdown(content) {
-    if (!content) {
-        return ''
-    }
-
-    const renderer = new marked.Renderer()
-
-    renderer.code = ({
-        text,
-        lang,
-    }) => {
-        const language =
-            lang
-                ? lang
-                    .trim()
-                    .split(/\s+/)[0]
-                    .toLowerCase()
-                : ''
-
-        let highlightedCode
-
-        if (
-            language &&
-            hljs.getLanguage(language)
-        ) {
-            highlightedCode =
-                hljs.highlight(
-                    text,
-                    {
-                        language,
-                        ignoreIllegals: true,
-                    },
-                ).value
-        } else {
-            highlightedCode =
-                hljs.highlightAuto(
-                    text,
-                ).value
-        }
-
-        const languageClass =
-            language
-                ? ` language-${language}`
-                : ''
-
-        return (
-            `<pre><code class="hljs${languageClass}">` +
-            highlightedCode +
-            '</code></pre>'
-        )
-    }
-
-    const html =
-        marked.parse(
-            content,
-            {
-                renderer,
-            },
-        )
-
-    const htmlWithImages =
-        resolveMarkdownImages(
-            html,
-        )
-
-    return DOMPurify.sanitize(
-        htmlWithImages,
-    )
-}
-
-async function chooseWikiRoot() {
-    if (!confirmDiscardChanges()) {
-        return
-    }
-
-    error.value = ''
-
-    try {
-        const picker = getFilePickerBuilder(
-            'Choose Wiki Root',
-        )
-            .setMultiSelect(false)
-            .allowDirectories(true)
-            .addButton({
-                label: 'Select folder',
-                variant: 'primary',
-                callback: (nodes) => {
-                    return nodes
-                },
-            })
-            .build()
-
-        const paths = await picker.pick()
-
-        if (
-            !paths ||
-            (
-                Array.isArray(paths) &&
-                paths.length === 0
-            )
-        ) {
-            return
-        }
-
-        const selectedPath =
-            normalizePath(
-                Array.isArray(paths)
-                    ? paths[0]
-                    : paths,
-            )
-
-        const body = new URLSearchParams()
-
-        body.set(
-            'wikiRoot',
-            selectedPath,
-        )
-
-        const response = await fetch(
-            OC.generateUrl(
-                '/apps/markdown_wiki/api/wiki-root',
-            ),
-            {
-                method: 'POST',
-                headers: {
-                    Accept: 'application/json',
-                },
-                body,
-            },
-        )
-
-        const data =
-            await response.json()
-
-        if (!response.ok) {
-            throw new Error(
-                data.message ||
-                    'Failed to save Wiki Root.',
-            )
-        }
-
-        stopEditing()
-
-        wikiRoot.value =
-            data.wikiRoot || ''
-
-        selectedFile.value = ''
-        selectedResource.value = null
-        markdown.value = ''
-        editedMarkdown.value = ''
-        fileError.value = ''
-        currentFolder.value = ''
-        saveError.value = ''
-        copyError.value = ''
-        copiedResourcePath.value = false
-
-        clearSearch()
-
-        expandedFolders.value = new Set()
-        tree.value = []
-
-        if (wikiRoot.value) {
-            await loadRootTree()
-        }
-    } catch (err) {
-        error.value =
-            err.message ||
-            'Failed to choose Wiki Root.'
-    }
-}
-
-async function loadWikiRoot() {
-    error.value = ''
-
-    try {
-        const response = await fetch(
-            OC.generateUrl(
-                '/apps/markdown_wiki/api/wiki-root',
-            ),
-            {
-                method: 'GET',
-                headers: {
-                    Accept: 'application/json',
-                },
-            },
-        )
-
-        const data =
-            await response.json()
-
-        if (!response.ok) {
-            throw new Error(
-                data.message ||
-                    'Failed to load Wiki Root.',
-            )
-        }
-
-        wikiRoot.value =
-            data.wikiRoot || ''
-
-        if (wikiRoot.value) {
-            await loadRootTree()
-        }
-    } catch (err) {
-        error.value =
-            err.message
-    }
-}
-
-const wikiRootName = computed(() => {
-    if (!wikiRoot.value) {
-        return 'Wiki Root'
-    }
-
-    return getNameFromPath(
-        wikiRoot.value,
-    )
-})
-
-const selectedFileName = computed(() => {
-    return getNameFromPath(
-        selectedFile.value,
-    )
-})
-
-const selectedFileDisplayName = computed(() => {
-    return getDisplayFileName(
-        selectedFile.value,
-    )
-})
-
-const currentFolderName = computed(() => {
-    if (!currentFolder.value) {
-        return wikiRootName.value
-    }
-
-    return getNameFromPath(
-        currentFolder.value,
-    )
-})
-
-const parentFolder = computed(() => {
-    const path =
-        selectedFile.value ||
-        currentFolder.value
-
-    if (!path) {
-        return ''
-    }
-
-    const parent =
-        getParentPath(path)
-
-    const root =
-        normalizePath(
-            wikiRoot.value,
-        )
-
-    if (
-        parent !== root &&
-        !parent.startsWith(
-            root + '/',
-        )
-    ) {
-        return root
-    }
-
-    return parent
-})
-
-const breadcrumbs = computed(() => {
-    if (
-        !selectedFile.value ||
-        !wikiRoot.value
-    ) {
-        return []
-    }
-
-    const root =
-        normalizePath(
-            wikiRoot.value,
-        )
-
-    const filePath =
-        normalizePath(
+    const selectedFileName = computed(() => {
+        return getNameFromPath(
             selectedFile.value,
         )
-
-    const relative =
-        filePath.slice(root.length)
-
-    const parts =
-        relative
-            .split('/')
-            .filter(Boolean)
-
-    parts.pop()
-
-    let path = root
-
-    return parts.map((name) => {
-        path += '/' + name
-
-        return {
-            name,
-            path,
-        }
     })
-})
 
-const isDirty = computed(() => {
-    return (
-        editing.value &&
-        editedMarkdown.value !==
-            markdown.value
-    )
-})
+    const selectedFileDisplayName = computed(() => {
+        return getDisplayFileName(
+            selectedFile.value,
+        )
+    })
 
-const renderedMarkdown = computed(() => {
-    return renderMarkdown(
-        markdown.value,
-    )
-})
-
-const renderedEditorMarkdown = computed(() => {
-    return renderMarkdown(
-        editedMarkdown.value,
-    )
-})
-
-const ResourceIcon = defineComponent({
-    name: 'ResourceIcon',
-
-    props: {
-        fileType: {
-            type: String,
-            default: 'file',
-        },
-    },
-
-    setup(props) {
-        return () => {
-            const common = {
-                viewBox: '0 0 24 24',
-                fill: 'none',
-                stroke: 'currentColor',
-                'stroke-width': '1.8',
-                'stroke-linecap': 'round',
-                'stroke-linejoin': 'round',
-                'aria-hidden': 'true',
-            }
-
-            if (
-                props.fileType === 'image'
-            ) {
-                return h(
-                    'svg',
-                    common,
-                    [
-                        h('rect', {
-                            x: '3',
-                            y: '3',
-                            width: '18',
-                            height: '18',
-                            rx: '2',
-                        }),
-                        h('circle', {
-                            cx: '8.5',
-                            cy: '8.5',
-                            r: '1.5',
-                        }),
-                        h('path', {
-                            d: 'm3 16 5-5 4 4 3-3 6 6',
-                        }),
-                    ],
-                )
-            }
-
-            if (
-                props.fileType === 'pdf'
-            ) {
-                return h(
-                    'svg',
-                    common,
-                    [
-                        h('path', {
-                            d: 'M6 2h9l4 4v16H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z',
-                        }),
-                        h('path', {
-                            d: 'M14 2v5h5',
-                        }),
-                        h('path', {
-                            d: 'M8 15h8M8 18h6',
-                        }),
-                    ],
-                )
-            }
-
-            if (
-                props.fileType === 'code'
-            ) {
-                return h(
-                    'svg',
-                    common,
-                    [
-                        h('path', {
-                            d: 'm8 8-4 4 4 4',
-                        }),
-                        h('path', {
-                            d: 'm16 8 4 4-4 4',
-                        }),
-                        h('path', {
-                            d: 'm14 4-4 16',
-                        }),
-                    ],
-                )
-            }
-
-            if (
-                props.fileType === 'archive'
-            ) {
-                return h(
-                    'svg',
-                    common,
-                    [
-                        h('path', {
-                            d: 'M6 3h12v18H6z',
-                        }),
-                        h('path', {
-                            d: 'M9 3v4h6V3',
-                        }),
-                        h('path', {
-                            d: 'M9 10h6M9 14h6M9 18h6',
-                        }),
-                    ],
-                )
-            }
-
-            if (
-                props.fileType === 'text'
-            ) {
-                return h(
-                    'svg',
-                    common,
-                    [
-                        h('path', {
-                            d: 'M6 2h9l4 4v16H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z',
-                        }),
-                        h('path', {
-                            d: 'M14 2v5h5',
-                        }),
-                        h('path', {
-                            d: 'M8 12h8M8 16h8M8 20h5',
-                        }),
-                    ],
-                )
-            }
-
-            if (
-                props.fileType === 'markdown'
-            ) {
-                return h(
-                    'svg',
-                    common,
-                    [
-                        h('path', {
-                            d: 'M5 3h9l5 5v13H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z',
-                        }),
-                        h('path', {
-                            d: 'M14 3v6h6',
-                        }),
-                        h('path', {
-                            d: 'M7 14h2l1 2 1-2h2v4',
-                        }),
-                    ],
-                )
-            }
-
-            return h(
-                'svg',
-                common,
-                [
-                    h('path', {
-                        d: 'M6 2h9l4 4v16H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z',
-                    }),
-                    h('path', {
-                        d: 'M14 2v5h5',
-                    }),
-                ],
-            )
+    const currentFolderName = computed(() => {
+        if (!currentFolder.value) {
+            return wikiRootName.value
         }
-    },
-})
 
-const TreeNode = defineComponent({
-    name: 'TreeNode',
+        return getNameFromPath(
+            currentFolder.value,
+        )
+    })
 
-    props: {
-        node: {
-            type: Object,
-            required: true,
+    const parentFolder = computed(() => {
+        const path =
+            selectedFile.value ||
+            currentFolder.value
+
+        if (!path) {
+            return ''
+        }
+
+        const parent =
+            getParentPath(path)
+
+        const root =
+            normalizePath(
+                wikiRoot.value,
+            )
+
+        if (
+            parent !== root &&
+            !parent.startsWith(
+                root + '/',
+            )
+        ) {
+            return root
+        }
+
+        return parent
+    })
+
+    const breadcrumbs = computed(() => {
+        if (
+            !selectedFile.value ||
+            !wikiRoot.value
+        ) {
+            return []
+        }
+
+        const root =
+            normalizePath(
+                wikiRoot.value,
+            )
+
+        const filePath =
+            normalizePath(
+                selectedFile.value,
+            )
+
+        const relative =
+            filePath.slice(root.length)
+
+        const parts =
+            relative
+                .split('/')
+                .filter(Boolean)
+
+        parts.pop()
+
+        let path = root
+
+        return parts.map((name) => {
+            path += '/' + name
+
+            return {
+                name,
+                path,
+            }
+        })
+    })
+
+    const isDirty = computed(() => {
+        return (
+            editing.value &&
+            editedMarkdown.value !==
+                markdown.value
+        )
+    })
+
+    const saveStatus = computed(() => {
+        if (!editing.value) {
+            return ''
+        }
+
+        if (savingFile.value) {
+            return 'Saving...'
+        }
+
+        if (saveError.value) {
+            return 'Save failed'
+        }
+
+        if (isDirty.value) {
+            return 'Unsaved changes'
+        }
+
+        return 'Saved'
+    })
+
+    const renderedMarkdown = computed(() => {
+        return renderMarkdown(
+            markdown.value,
+        )
+    })
+
+    const renderedEditorMarkdown = computed(() => {
+        return renderMarkdown(
+            editedMarkdown.value,
+        )
+    })
+
+    const ResourceIcon = defineComponent({
+        name: 'ResourceIcon',
+
+        props: {
+            fileType: {
+                type: String,
+                default: 'file',
+            },
         },
 
-        selectedFile: {
-            type: String,
-            default: '',
-        },
+        setup(props) {
+            return () => {
+                const common = {
+                    viewBox: '0 0 24 24',
+                    fill: 'none',
+                    stroke: 'currentColor',
+                    'stroke-width': '1.8',
+                    'stroke-linecap': 'round',
+                    'stroke-linejoin': 'round',
+                    'aria-hidden': 'true',
+                }
 
-        selectedResource: {
-            type: Object,
-            default: null,
-        },
+                if (
+                    props.fileType === 'image'
+                ) {
+                    return h(
+                        'svg',
+                        common,
+                        [
+                            h('rect', {
+                                x: '3',
+                                y: '3',
+                                width: '18',
+                                height: '18',
+                                rx: '2',
+                            }),
+                            h('circle', {
+                                cx: '8.5',
+                                cy: '8.5',
+                                r: '1.5',
+                            }),
+                            h('path', {
+                                d: 'm3 16 5-5 4 4 3-3 6 6',
+                            }),
+                        ],
+                    )
+                }
 
-        expandedFolders: {
-            type: Object,
-            required: true,
-        },
-    },
+                if (
+                    props.fileType === 'pdf'
+                ) {
+                    return h(
+                        'svg',
+                        common,
+                        [
+                            h('path', {
+                                d: 'M6 2h9l4 4v16H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z',
+                            }),
+                            h('path', {
+                                d: 'M14 2v5h5',
+                            }),
+                            h('path', {
+                                d: 'M8 15h8M8 18h6',
+                            }),
+                        ],
+                    )
+                }
 
-    emits: [
-        'toggle-folder',
-        'open-file',
-        'select-resource',
-    ],
+                if (
+                    props.fileType === 'code'
+                ) {
+                    return h(
+                        'svg',
+                        common,
+                        [
+                            h('path', {
+                                d: 'm8 8-4 4 4 4',
+                            }),
+                            h('path', {
+                                d: 'm16 8 4 4-4 4',
+                            }),
+                            h('path', {
+                                d: 'm14 4-4 16',
+                            }),
+                        ],
+                    )
+                }
 
-    setup(props, { emit }) {
-        return () => {
-            const nodePath =
-                normalizePath(
-                    props.node.path,
+                if (
+                    props.fileType === 'archive'
+                ) {
+                    return h(
+                        'svg',
+                        common,
+                        [
+                            h('path', {
+                                d: 'M6 3h12v18H6z',
+                            }),
+                            h('path', {
+                                d: 'M9 3v4h6V3',
+                            }),
+                            h('path', {
+                                d: 'M9 10h6M9 14h6M9 18h6',
+                            }),
+                        ],
+                    )
+                }
+
+                if (
+                    props.fileType === 'text'
+                ) {
+                    return h(
+                        'svg',
+                        common,
+                        [
+                            h('path', {
+                                d: 'M6 2h9l4 4v16H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z',
+                            }),
+                            h('path', {
+                                d: 'M14 2v5h5',
+                            }),
+                            h('path', {
+                                d: 'M8 12h8M8 16h8M8 20h5',
+                            }),
+                        ],
+                    )
+                }
+
+                if (
+                    props.fileType === 'markdown'
+                ) {
+                    return h(
+                        'svg',
+                        common,
+                        [
+                            h('path', {
+                                d: 'M5 3h9l5 5v13H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z',
+                            }),
+                            h('path', {
+                                d: 'M14 3v6h6',
+                            }),
+                            h('path', {
+                                d: 'M7 14h2l1 2 1-2h2v4',
+                            }),
+                        ],
+                    )
+                }
+
+                return h(
+                    'svg',
+                    common,
+                    [
+                        h('path', {
+                            d: 'M6 2h9l4 4v16H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z',
+                        }),
+                        h('path', {
+                            d: 'M14 2v5h5',
+                        }),
+                    ],
                 )
+            }
+        },
+    })
 
-            const expanded =
-                props.expandedFolders.has(
-                    nodePath,
-                )
+    const TreeNode = defineComponent({
+        name: 'TreeNode',
 
-            const selectedFile =
-                props.node.type ===
-                    'file' &&
-                normalizePath(
-                    props.selectedFile,
-                ) === nodePath
+        props: {
+            node: {
+                type: Object,
+                required: true,
+            },
 
-            const selectedResource =
-                props.node.type ===
-                    'file' &&
-                props.selectedResource &&
-                normalizePath(
-                    props.selectedResource.path,
-                ) === nodePath
+            selectedFile: {
+                type: String,
+                default: '',
+            },
 
-            const children =
-                props.node.children || []
+            selectedResource: {
+                type: Object,
+                default: null,
+            },
 
-            const icon =
-                props.node.type ===
-                    'folder'
-                    ? h(
-                          'svg',
-                          {
-                              class:
-                                  'tree-folder-icon',
-                              viewBox:
-                                  '0 0 24 24',
-                              fill:
-                                  'none',
-                              stroke:
-                                  'currentColor',
-                              'stroke-width':
-                                  '2',
-                              'stroke-linecap':
-                                  'round',
-                              'stroke-linejoin':
-                                  'round',
-                          },
-                          [
-                              h(
-                                  'path',
-                                  {
-                                      d: 'M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z',
-                                  },
-                              ),
-                          ],
-                      )
-                    : h(
-                          ResourceIcon,
-                          {
-                              fileType:
-                                  props.node
-                                      .fileType,
-                          },
-                      )
+            expandedFolders: {
+                type: Object,
+                required: true,
+            },
+        },
 
-            return h(
-                'li',
-                {
-                    class: 'tree-item',
-                },
-                [
-                    h(
-                        'button',
-                        {
-                            type: 'button',
+        emits: [
+            'toggle-folder',
+            'open-file',
+            'select-resource',
+        ],
 
-                            class: [
-                                'tree-button',
-                                {
-                                    'tree-button-active':
-                                        selectedFile,
+        setup(props, { emit }) {
+            return () => {
+                const nodePath =
+                    normalizePath(
+                        props.node.path,
+                    )
 
-                                    'tree-button-resource-active':
-                                        selectedResource,
+                const expanded =
+                    props.expandedFolders.has(
+                        nodePath,
+                    )
 
-                                    'tree-button-folder-active':
-                                        props.node.type ===
-                                            'folder' &&
-                                        expanded,
-                                },
+                const selectedFile =
+                    props.node.type ===
+                        'file' &&
+                    normalizePath(
+                        props.selectedFile,
+                    ) === nodePath
+
+                const selectedResource =
+                    props.node.type ===
+                        'file' &&
+                    props.selectedResource &&
+                    normalizePath(
+                        props.selectedResource.path,
+                    ) === nodePath
+
+                const children =
+                    props.node.children || []
+
+                const icon =
+                    props.node.type ===
+                        'folder'
+                        ? h(
+                            'svg',
+                            {
+                                class:
+                                    'tree-folder-icon',
+                                viewBox:
+                                    '0 0 24 24',
+                                fill:
+                                    'none',
+                                stroke:
+                                    'currentColor',
+                                'stroke-width':
+                                    '2',
+                                'stroke-linecap':
+                                    'round',
+                                'stroke-linejoin':
+                                    'round',
+                            },
+                            [
+                                h(
+                                    'path',
+                                    {
+                                        d: 'M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z',
+                                    },
+                                ),
                             ],
-
-                            title:
-                                props.node.name,
-
-                            'aria-label':
-                                props.node.name,
-
-                            onClick: () => {
-                                if (
+                        )
+                        : h(
+                            ResourceIcon,
+                            {
+                                fileType:
                                     props.node
-                                        .type ===
-                                    'folder'
-                                ) {
+                                        .fileType,
+                            },
+                        )
+
+                return h(
+                    'li',
+                    {
+                        class: 'tree-item',
+                    },
+                    [
+                        h(
+                            'button',
+                            {
+                                type: 'button',
+
+                                class: [
+                                    'tree-button',
+                                    {
+                                        'tree-button-active':
+                                            selectedFile,
+
+                                        'tree-button-resource-active':
+                                            selectedResource,
+
+                                        'tree-button-folder-active':
+                                            props.node.type ===
+                                                'folder' &&
+                                            expanded,
+                                    },
+                                ],
+
+                                title:
+                                    props.node.name,
+
+                                'aria-label':
+                                    props.node.name,
+
+                                onClick: () => {
+                                    if (
+                                        props.node
+                                            .type ===
+                                        'folder'
+                                    ) {
+                                        emit(
+                                            'toggle-folder',
+                                            props.node,
+                                        )
+
+                                        return
+                                    }
+
+                                    if (
+                                        props.node
+                                            .fileType ===
+                                        'markdown'
+                                    ) {
+                                        emit(
+                                            'open-file',
+                                            props.node.path,
+                                        )
+
+                                        return
+                                    }
+
                                     emit(
-                                        'toggle-folder',
+                                        'select-resource',
                                         props.node,
                                     )
-
-                                    return
-                                }
-
-                                if (
-                                    props.node
-                                        .fileType ===
-                                    'markdown'
-                                ) {
-                                    emit(
-                                        'open-file',
-                                        props.node.path,
-                                    )
-
-                                    return
-                                }
-
-                                emit(
-                                    'select-resource',
-                                    props.node,
-                                )
+                                },
                             },
-                        },
-                        [
-                            h(
-                                'span',
+                            [
+                                h(
+                                    'span',
+                                    {
+                                        class:
+                                            'tree-chevron',
+                                    },
+                                    props.node
+                                        .type ===
+                                        'folder'
+                                        ? expanded
+                                            ? '⌄'
+                                            : '›'
+                                        : '',
+                                ),
+
+                                h(
+                                    'span',
+                                    {
+                                        class:
+                                            'tree-icon',
+                                    },
+                                    [icon],
+                                ),
+
+                                h(
+                                    'span',
+                                    {
+                                        class:
+                                            'tree-name',
+                                    },
+                                    props.node.name,
+                                ),
+                            ],
+                        ),
+
+                        props.node.type ===
+                            'folder' &&
+                        expanded &&
+                        children.length > 0
+                            ? h(
+                                'ul',
                                 {
                                     class:
-                                        'tree-chevron',
+                                        'tree-list',
+                                    style: {
+                                        paddingLeft:
+                                            '18px',
+                                    },
                                 },
-                                props.node
-                                    .type ===
-                                    'folder'
-                                    ? expanded
-                                        ? '⌄'
-                                        : '›'
-                                    : '',
-                            ),
+                                children.map(
+                                    (child) =>
+                                        h(
+                                            TreeNode,
+                                            {
+                                                key: child.path,
+                                                node: child,
 
-                            h(
-                                'span',
-                                {
-                                    class:
-                                        'tree-icon',
-                                },
-                                [icon],
-                            ),
+                                                selectedFile:
+                                                    props.selectedFile,
 
-                            h(
-                                'span',
-                                {
-                                    class:
-                                        'tree-name',
-                                },
-                                props.node.name,
-                            ),
-                        ],
-                    ),
+                                                selectedResource:
+                                                    props.selectedResource,
 
-                    props.node.type ===
-                        'folder' &&
-                    expanded &&
-                    children.length > 0
-                        ? h(
-                              'ul',
-                              {
-                                  class:
-                                      'tree-list',
-                                  style: {
-                                      paddingLeft:
-                                          '18px',
-                                  },
-                              },
-                              children.map(
-                                  (child) =>
-                                      h(
-                                          TreeNode,
-                                          {
-                                              key: child.path,
-                                              node: child,
+                                                expandedFolders:
+                                                    props.expandedFolders,
 
-                                              selectedFile:
-                                                  props.selectedFile,
+                                                onToggleFolder:
+                                                    (
+                                                        childNode,
+                                                    ) =>
+                                                        emit(
+                                                            'toggle-folder',
+                                                            childNode,
+                                                        ),
 
-                                              selectedResource:
-                                                  props.selectedResource,
+                                                onOpenFile:
+                                                    (
+                                                        filePath,
+                                                    ) =>
+                                                        emit(
+                                                            'open-file',
+                                                            filePath,
+                                                        ),
 
-                                              expandedFolders:
-                                                  props.expandedFolders,
+                                                onSelectResource:
+                                                    (
+                                                        resourceNode,
+                                                    ) =>
+                                                        emit(
+                                                            'select-resource',
+                                                            resourceNode,
+                                                        ),
+                                            },
+                                        ),
+                                ),
+                            )
+                            : null,
+                    ],
+                )
+            }
+        },
+    })
 
-                                              onToggleFolder:
-                                                  (
-                                                      childNode,
-                                                  ) =>
-                                                      emit(
-                                                          'toggle-folder',
-                                                          childNode,
-                                                      ),
+    const CreateLocationNode = defineComponent({
+        name: 'CreateLocationNode',
 
-                                              onOpenFile:
-                                                  (
-                                                      filePath,
-                                                  ) =>
-                                                      emit(
-                                                          'open-file',
-                                                          filePath,
-                                                      ),
+        props: {
+            node: {
+                type: Object,
+                required: true,
+            },
 
-                                              onSelectResource:
-                                                  (
-                                                      resourceNode,
-                                                  ) =>
-                                                      emit(
-                                                          'select-resource',
-                                                          resourceNode,
-                                                      ),
-                                          },
-                                      ),
-                              ),
-                          )
-                        : null,
-                ],
+            selectedPath: {
+                type: String,
+                required: true,
+            },
+
+            expandedFolders: {
+                type: Object,
+                required: true,
+            },
+        },
+
+        emits: [
+            'toggle-folder',
+            'select-folder',
+        ],
+
+        setup(props, { emit }) {
+            const folderChildren = computed(() =>
+                (props.node.children || []).filter(
+                    child => child.type === 'folder',
+                ),
             )
+
+            const nodePath = computed(() =>
+                normalizePath(props.node.path),
+            )
+
+            const expanded = computed(() =>
+                props.expandedFolders.has(
+                    nodePath.value,
+                ),
+            )
+
+            /*
+            * A folder can have children that have not
+            * been loaded yet. Therefore, show the
+            * chevron until we know that the folder is
+            * actually empty.
+            */
+            const hasExpandableChildren = computed(() =>
+                !props.node.loaded ||
+                folderChildren.value.length > 0,
+            )
+
+            return () =>
+                h(
+                    'li',
+                    {
+                        class: 'create-location-item',
+                    },
+                    [
+                        h(
+                            'div',
+                            {
+                                class: [
+                                    'create-location-row',
+                                    props.selectedPath ===
+                                        nodePath.value
+                                        ? 'create-location-row-selected'
+                                        : '',
+                                ],
+                            },
+                            [
+                                h(
+                                    'button',
+                                    {
+                                        type: 'button',
+                                        class: 'create-location-toggle',
+
+                                        'aria-label':
+                                            expanded.value
+                                                ? 'Collapse folder'
+                                                : 'Expand folder',
+
+                                        onClick: (event) => {
+                                            event.preventDefault()
+                                            event.stopPropagation()
+
+                                            emit(
+                                                'toggle-folder',
+                                                props.node,
+                                            )
+                                        },
+                                    },
+                                    hasExpandableChildren.value
+                                        ? expanded.value
+                                            ? '⌄'
+                                            : '›'
+                                        : '',
+                                ),
+
+                                h(
+                                    'button',
+                                    {
+                                        type: 'button',
+                                        class: 'create-location-select',
+
+                                        onClick: (event) => {
+                                            event.preventDefault()
+                                            event.stopPropagation()
+
+                                            emit(
+                                                'select-folder',
+                                                props.node.path,
+                                            )
+                                        },
+                                    },
+                                    [
+                                        h(
+                                            'span',
+                                            {
+                                                class:
+                                                    'create-location-icon',
+                                            },
+                                            [
+                                                h(
+                                                    'svg',
+                                                    {
+                                                        viewBox:
+                                                            '0 0 24 24',
+                                                        fill: 'none',
+                                                        stroke:
+                                                            'currentColor',
+                                                        'stroke-width':
+                                                            '2',
+                                                        'stroke-linecap':
+                                                            'round',
+                                                        'stroke-linejoin':
+                                                            'round',
+                                                        'aria-hidden':
+                                                            'true',
+                                                    },
+                                                    [
+                                                        h('path', {
+                                                            d:
+                                                                'M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z',
+                                                        }),
+                                                    ],
+                                                ),
+                                            ],
+                                        ),
+
+                                        h(
+                                            'span',
+                                            {
+                                                class:
+                                                    'create-location-name',
+                                            },
+                                            props.node.name,
+                                        ),
+                                    ],
+                                ),
+                            ],
+                        ),
+
+                        expanded.value &&
+                        folderChildren.value.length > 0
+                            ? h(
+                                'ul',
+                                {
+                                    class:
+                                        'create-location-children',
+                                },
+                                folderChildren.value.map(
+                                    child =>
+                                        h(
+                                            CreateLocationNode,
+                                            {
+                                                key:
+                                                    child.path,
+
+                                                node: child,
+
+                                                selectedPath:
+                                                    props.selectedPath,
+
+                                                expandedFolders:
+                                                    props.expandedFolders,
+
+                                                onToggleFolder:
+                                                    childNode =>
+                                                        emit(
+                                                            'toggle-folder',
+                                                            childNode,
+                                                        ),
+
+                                                onSelectFolder:
+                                                    path =>
+                                                        emit(
+                                                            'select-folder',
+                                                            path,
+                                                        ),
+                                            },
+                                        ),
+                                ),
+                            )
+                            : null,
+                    ],
+                )
+        },
+    })
+
+    watch(searchQuery, () => {
+        scheduleSearch()
+    })
+
+    onMounted(() => {
+        loadSearchHistory()
+
+        document.addEventListener(
+            'click',
+            handleDocumentClick,
+        )
+
+        loadWikiRoot()
+
+        window.addEventListener(
+            'beforeunload',
+            handleBeforeUnload,
+        )
+    })
+
+    onBeforeUnmount(() => {
+        document.removeEventListener(
+            'click',
+            handleDocumentClick,
+        )
+
+        window.removeEventListener(
+            'beforeunload',
+            handleBeforeUnload,
+        )
+
+        if (searchTimeout !== null) {
+            window.clearTimeout(searchTimeout)
+            searchTimeout = null
         }
-    },
-})
 
-/*
- * Search when the user changes the query.
- *
- * The small debounce prevents a request from being
- * sent for every single keystroke immediately.
- */
-watch(searchQuery, () => {
-    scheduleSearch()
-})
-
-onMounted(() => {
-    loadWikiRoot()
-
-    window.addEventListener(
-        'beforeunload',
-        handleBeforeUnload,
-    )
-})
-
-onBeforeUnmount(() => {
-    window.removeEventListener(
-        'beforeunload',
-        handleBeforeUnload,
-    )
-
-    if (searchTimeout !== null) {
-        window.clearTimeout(searchTimeout)
-        searchTimeout = null
-    }
-
-    searchRequestId++
-})
+        searchRequestId++
+    })
 </script>

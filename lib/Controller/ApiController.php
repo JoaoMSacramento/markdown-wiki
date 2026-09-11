@@ -71,9 +71,6 @@ class ApiController extends Controller
             ], 400);
         }
 
-        /*
-         * Prevent path traversal and invalid relative paths.
-         */
         if (
             str_contains($wikiRoot, '/../') ||
             str_ends_with($wikiRoot, '/..') ||
@@ -161,9 +158,6 @@ class ApiController extends Controller
 
         $normalizedPath = '/' . trim($requestedPath, '/');
 
-        /*
-         * Prevent access outside the configured Wiki Root.
-         */
         if (
             $normalizedPath !== $normalizedRoot
             && !str_starts_with(
@@ -205,15 +199,6 @@ class ApiController extends Controller
         $items = [];
 
         foreach ($folder->getDirectoryListing() as $node) {
-            /*
-             * Convert Nextcloud's internal user path:
-             *
-             * /admin/files/MDs_Test/Test.md
-             *
-             * into the user-relative path used by the application:
-             *
-             * /MDs_Test/Test.md
-             */
             $nodePath = $node->getPath();
             $userFolderPath = $userFolder->getPath();
 
@@ -243,10 +228,6 @@ class ApiController extends Controller
                 $node->getExtension(),
             );
 
-            /*
-             * In the default Markdown mode we only expose
-             * Markdown files.
-             */
             if (
                 !$showAll &&
                 $extension !== 'md'
@@ -318,10 +299,6 @@ class ApiController extends Controller
             ];
         }
 
-        /*
-         * Folders always come first.
-         * Files are sorted alphabetically.
-         */
         usort(
             $items,
             static function (array $a, array $b): int {
@@ -463,9 +440,6 @@ class ApiController extends Controller
         $normalizedRoot = '/' . trim($wikiRoot, '/');
         $normalizedPath = '/' . trim($path, '/');
 
-        /*
-         * Reject invalid paths before accessing the filesystem.
-         */
         if (
             $normalizedPath === '/'
             || str_contains($normalizedPath, '/../')
@@ -480,9 +454,6 @@ class ApiController extends Controller
             ], 400);
         }
 
-        /*
-         * The file must remain inside the configured Wiki Root.
-         */
         if (
             $normalizedPath !== $normalizedRoot
             && !str_starts_with(
@@ -496,9 +467,6 @@ class ApiController extends Controller
             ], 403);
         }
 
-        /*
-         * Only Markdown files can currently be edited.
-         */
         if (
             strtolower(
                 pathinfo(
@@ -552,6 +520,272 @@ class ApiController extends Controller
         return new DataResponse([
             'success' => true,
             'name' => $file->getName(),
+            'path' => $normalizedPath,
+        ]);
+    }
+
+    #[NoCSRFRequired]
+    #[NoAdminRequired]
+    public function createFile(string $path): DataResponse
+    {
+        $user = $this->userSession->getUser();
+
+        if ($user === null) {
+            return new DataResponse([
+                'success' => false,
+                'message' => 'Not authenticated.',
+            ], 401);
+        }
+
+        $wikiRoot = $this->config->getUserValue(
+            $user->getUID(),
+            $this->appName,
+            'wiki_root',
+            '',
+        );
+
+        if ($wikiRoot === '') {
+            return new DataResponse([
+                'success' => false,
+                'message' => 'Wiki Root is not configured.',
+            ], 400);
+        }
+
+        $normalizedRoot = '/' . trim($wikiRoot, '/');
+        $normalizedPath = '/' . trim($path, '/');
+
+        if (
+            $normalizedPath === '/'
+            || str_contains($normalizedPath, '/../')
+            || str_ends_with($normalizedPath, '/..')
+            || str_starts_with($normalizedPath, '../')
+            || str_contains($normalizedPath, '/./')
+            || str_ends_with($normalizedPath, '/.')
+        ) {
+            return new DataResponse([
+                'success' => false,
+                'message' => 'Invalid file path.',
+            ], 400);
+        }
+
+        if (
+            $normalizedPath === $normalizedRoot
+            || !str_starts_with(
+                $normalizedPath,
+                $normalizedRoot . '/',
+            )
+        ) {
+            return new DataResponse([
+                'success' => false,
+                'message' => 'File is outside Wiki Root.',
+            ], 403);
+        }
+
+        /*
+         * Only Markdown files can be created.
+         */
+        if (
+            strtolower(
+                pathinfo(
+                    $normalizedPath,
+                    PATHINFO_EXTENSION,
+                ),
+            ) !== 'md'
+        ) {
+            return new DataResponse([
+                'success' => false,
+                'message' => 'Only Markdown files can be created.',
+            ], 400);
+        }
+
+        $fileName = basename($normalizedPath);
+        $parentPath = dirname($normalizedPath);
+
+        if (
+            $fileName === ''
+            || $fileName === '.'
+            || $fileName === '..'
+            || str_contains($fileName, '/')
+            || str_contains($fileName, '\\')
+        ) {
+            return new DataResponse([
+                'success' => false,
+                'message' => 'Invalid file name.',
+            ], 400);
+        }
+
+        $userFolder = $this->rootFolder->getUserFolder(
+            $user->getUID(),
+        );
+
+        $relativeParentPath = ltrim($parentPath, '/');
+
+        try {
+            $parentFolder = $userFolder->get(
+                $relativeParentPath,
+            );
+        } catch (\OCP\Files\NotFoundException) {
+            return new DataResponse([
+                'success' => false,
+                'message' => 'Parent folder was not found.',
+            ], 404);
+        }
+
+        if (!$parentFolder instanceof Folder) {
+            return new DataResponse([
+                'success' => false,
+                'message' => 'Parent path is not a folder.',
+            ], 400);
+        }
+
+        /*
+         * Do not overwrite an existing node.
+         */
+        if ($parentFolder->nodeExists($fileName)) {
+            return new DataResponse([
+                'success' => false,
+                'message' => 'A file or folder with that name already exists.',
+            ], 409);
+        }
+
+        try {
+            $file = $parentFolder->newFile(
+                $fileName,
+                '',
+            );
+        } catch (\Throwable $e) {
+            return new DataResponse([
+                'success' => false,
+                'message' => 'Failed to create the Markdown file.',
+            ], 500);
+        }
+
+        return new DataResponse([
+            'success' => true,
+            'name' => $file->getName(),
+            'path' => $normalizedPath,
+        ]);
+    }
+
+    #[NoCSRFRequired]
+    #[NoAdminRequired]
+    public function createFolder(string $path): DataResponse
+    {
+        $user = $this->userSession->getUser();
+
+        if ($user === null) {
+            return new DataResponse([
+                'success' => false,
+                'message' => 'Not authenticated.',
+            ], 401);
+        }
+
+        $wikiRoot = $this->config->getUserValue(
+            $user->getUID(),
+            $this->appName,
+            'wiki_root',
+            '',
+        );
+
+        if ($wikiRoot === '') {
+            return new DataResponse([
+                'success' => false,
+                'message' => 'Wiki Root is not configured.',
+            ], 400);
+        }
+
+        $normalizedRoot = '/' . trim($wikiRoot, '/');
+        $normalizedPath = '/' . trim($path, '/');
+
+        // Prevent path traversal
+        if (
+            $normalizedPath === '/'
+            || str_contains($normalizedPath, '/../')
+            || str_ends_with($normalizedPath, '/..')
+            || str_contains($normalizedPath, '/./')
+            || str_ends_with($normalizedPath, '/.')
+        ) {
+            return new DataResponse([
+                'success' => false,
+                'message' => 'Invalid folder path.',
+            ], 400);
+        }
+
+        // Folder must be inside Wiki Root
+        if (
+            $normalizedPath === $normalizedRoot
+            || !str_starts_with(
+                $normalizedPath,
+                $normalizedRoot . '/',
+            )
+        ) {
+            return new DataResponse([
+                'success' => false,
+                'message' => 'Folder is outside Wiki Root.',
+            ], 403);
+        }
+
+        $folderName = basename($normalizedPath);
+        $parentPath = dirname($normalizedPath);
+
+        // Validate folder name
+        if (
+            $folderName === ''
+            || $folderName === '.'
+            || $folderName === '..'
+            || str_contains($folderName, '/')
+            || str_contains($folderName, '\\')
+        ) {
+            return new DataResponse([
+                'success' => false,
+                'message' => 'Invalid folder name.',
+            ], 400);
+        }
+
+        $userFolder = $this->rootFolder->getUserFolder(
+            $user->getUID(),
+        );
+
+        $relativeParentPath = ltrim($parentPath, '/');
+
+        try {
+            $parentFolder = $userFolder->get(
+                $relativeParentPath,
+            );
+        } catch (\OCP\Files\NotFoundException) {
+            return new DataResponse([
+                'success' => false,
+                'message' => 'Parent folder was not found.',
+            ], 404);
+        }
+
+        if (!$parentFolder instanceof Folder) {
+            return new DataResponse([
+                'success' => false,
+                'message' => 'Parent path is not a folder.',
+            ], 400);
+        }
+
+        // Do not overwrite an existing file/folder
+        if ($parentFolder->nodeExists($folderName)) {
+            return new DataResponse([
+                'success' => false,
+                'message' => 'A file or folder with that name already exists.',
+            ], 409);
+        }
+
+        try {
+            $folder = $parentFolder->newFolder($folderName);
+        } catch (\Throwable $e) {
+            return new DataResponse([
+                'success' => false,
+                'message' => 'Failed to create the folder.',
+            ], 500);
+        }
+
+        return new DataResponse([
+            'success' => true,
+            'name' => $folder->getName(),
             'path' => $normalizedPath,
         ]);
     }
@@ -632,11 +866,11 @@ class ApiController extends Controller
             $results,
         );
 
-        /*
-         * Keep the response bounded so a broad query cannot
-         * generate an unnecessarily large response.
-         */
-        $results = array_slice($results, 0, 100);
+        $results = array_slice(
+            $results,
+            0,
+            100,
+        );
 
         return new DataResponse([
             'success' => true,
@@ -680,6 +914,7 @@ class ApiController extends Controller
             }
 
             $nodeName = $node->getName();
+
             $nameMatch = mb_stripos(
                 $nodeName,
                 $query,
