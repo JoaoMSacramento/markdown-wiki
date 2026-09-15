@@ -268,7 +268,7 @@
                 </p>
             </div>
 
-            <div class="file-tree">
+            <div class="file-tree-section">
                 <div class="tree-header-row">
                     <div class="tree-header">
                         <span>Files</span>
@@ -356,9 +356,13 @@
                 </div>
 
                 <div
-                    v-if="loadingTree"
-                    class="tree-status"
+                    ref="fileTreeElement"
+                    class="file-tree"
                 >
+                    <div
+                        v-if="loadingTree"
+                        class="tree-status"
+                    >
                     Loading...
                 </div>
 
@@ -391,12 +395,20 @@
                         :selected-file="selectedFile"
                         :selected-resource="selectedResource"
                         :expanded-folders="expandedFolders"
+                        :drag-source-path="treeDragSourcePath"
+                        :drop-target-path="treeDropTargetPath"
+                        :drop-target-valid="treeDropTargetValid"
                         @toggle-folder="toggleFolder"
                         @open-file="openFile"
                         @select-resource="selectResource"
                         @context-menu="openContextMenu"
+                        @drag-start="handleTreeDragStart"
+                        @drag-end="handleTreeDragEnd"
+                        @drag-over="handleTreeDragOver"
+                        @drop="handleTreeDrop"
                     />
                 </ul>
+                </div>
             </div>
         </aside>
 
@@ -1577,6 +1589,74 @@
         </Teleport>
 
         <!--
+         * Unsaved changes dialog.
+         -->
+        <Teleport to="body">
+            <div
+                v-if="unsavedChangesDialogVisible"
+                class="create-dialog-backdrop wiki-modal-backdrop"
+                @click.self="resolveUnsavedChanges(false)"
+            >
+                <div
+                    ref="unsavedChangesDialogElement"
+                    class="create-dialog delete-dialog"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="unsaved-changes-dialog-title"
+                    tabindex="-1"
+                    @keydown.esc="resolveUnsavedChanges(false)"
+                >
+                    <div class="create-dialog-header">
+                        <h2
+                            id="unsaved-changes-dialog-title"
+                            class="create-dialog-title"
+                        >
+                            Unsaved changes
+                        </h2>
+
+                        <button
+                            type="button"
+                            class="create-dialog-close"
+                            aria-label="Close"
+                            title="Close"
+                            @click="resolveUnsavedChanges(false)"
+                        >
+                            ×
+                        </button>
+                    </div>
+
+                    <div class="create-dialog-body delete-dialog-body">
+                        <p class="delete-dialog-description">
+                            You have unsaved changes. Do you want to discard them?
+                        </p>
+
+                        <p class="delete-dialog-warning">
+                            Your unsaved changes will be lost.
+                        </p>
+                    </div>
+
+                    <div class="create-dialog-footer">
+                        <button
+                            type="button"
+                            class="create-dialog-button create-dialog-button-secondary"
+                            @click="resolveUnsavedChanges(false)"
+                        >
+                            Keep editing
+                        </button>
+
+                        <button
+                            type="button"
+                            class="create-dialog-button create-dialog-button-danger"
+                            @click="resolveUnsavedChanges(true)"
+                        >
+                            Discard changes
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </Teleport>
+
+        <!--
         * File tree context menu.
         -->
         <div
@@ -2228,6 +2308,7 @@
     const searchHistory = ref([])
     const searchHistoryVisible = ref(false)
     const searchContainer = ref(null)
+    const fileTreeElement = ref(null)
 
     const searchHistoryStorageKey =
         'markdown_wiki_search_history'
@@ -2646,6 +2727,14 @@
         const previousFolder =
             currentFolder.value
 
+        /*
+         * Changing Markdown / All files rebuilds the tree. Preserve the
+         * user's exact vertical and horizontal position across that
+         * rebuild instead of letting the new tree jump back to the top.
+         */
+        const previousTreeScroll =
+            getFileTreeScrollPosition()
+
         treeMode.value = mode
 
         await loadRootTree(false)
@@ -2668,6 +2757,10 @@
                 normalizePath(
                     wikiRoot.value,
                 )
+
+            await restoreFileTreeScrollPosition(
+                previousTreeScroll,
+            )
 
             return
         }
@@ -2694,6 +2787,10 @@
                     wikiRoot.value,
                 )
         }
+
+        await restoreFileTreeScrollPosition(
+            previousTreeScroll,
+        )
     }
 
     async function toggleFolder(node) {
@@ -2724,6 +2821,14 @@
         expandedFolders.value = next
 
         currentFolder.value = path
+
+        /*
+         * When a deeply nested folder is opened, keep its row fully
+         * visible inside the tree. This only moves the tree by the
+         * minimum amount required and leaves it untouched when the
+         * folder is already completely visible.
+         */
+        await scrollExpandedFolderIntoView(path)
     }
 
     /*
@@ -2842,12 +2947,477 @@
         editing.value = false
     }
 
-    async function refreshAfterContextMutation() {
+    function findNodeByPath(nodes, path) {
+        const normalizedPath =
+            normalizePath(path)
+
+        for (const node of nodes || []) {
+            if (
+                normalizePath(node.path) ===
+                normalizedPath
+            ) {
+                return node
+            }
+
+            if (
+                node.type === 'folder' &&
+                Array.isArray(node.children) &&
+                node.children.length
+            ) {
+                const found =
+                    findNodeByPath(
+                        node.children,
+                        normalizedPath,
+                    )
+
+                if (found) {
+                    return found
+                }
+            }
+        }
+
+        return null
+    }
+
+    async function ensureTreePathExpanded(path) {
+        const normalizedPath =
+            normalizePath(path)
+
+        const rootPath =
+            normalizePath(wikiRoot.value)
+
+        if (
+            !normalizedPath ||
+            !rootPath ||
+            (
+                normalizedPath !== rootPath &&
+                !normalizedPath.startsWith(
+                    rootPath + '/',
+                )
+            )
+        ) {
+            return
+        }
+
+        const relativePath =
+            normalizedPath === rootPath
+                ? ''
+                : normalizedPath.slice(
+                    rootPath.length + 1,
+                )
+
+        const parts =
+            relativePath
+                .split('/')
+                .filter(Boolean)
+
+        if (parts.length <= 1) {
+            return
+        }
+
+        const next =
+            new Set(expandedFolders.value)
+
+        let currentPath =
+            rootPath
+
+        /*
+         * Expand every ancestor, but not the created item itself.
+         * Loading each ancestor ensures deeply nested targets exist
+         * in the rendered tree before we try to scroll to them.
+         */
+        for (
+            let index = 0;
+            index < parts.length - 1;
+            index++
+        ) {
+            currentPath =
+                normalizePath(
+                    `${currentPath}/${parts[index]}`,
+                )
+
+            next.add(currentPath)
+            expandedFolders.value =
+                new Set(next)
+
+            const node =
+                findNodeByPath(
+                    tree.value,
+                    currentPath,
+                )
+
+            if (
+                node &&
+                node.type === 'folder' &&
+                !node.loaded
+            ) {
+                await loadFolderChildren(node)
+            }
+        }
+
+        expandedFolders.value =
+            new Set(next)
+
+        await nextTick()
+    }
+
+    function getTreeElementByPath(path) {
+        const container =
+            fileTreeElement.value
+
+        if (!container) {
+            return null
+        }
+
+        const normalizedPath =
+            normalizePath(path)
+
+        const item = [
+            ...container.querySelectorAll(
+                '[data-tree-path]',
+            ),
+        ].find(
+            (element) =>
+                element.dataset.treePath ===
+                normalizedPath,
+        )
+
+        if (!item) {
+            return null
+        }
+
+        return (
+            item.querySelector(
+                ':scope > .tree-button',
+            ) || item
+        )
+    }
+
+    async function scrollExpandedFolderIntoView(path) {
+        /*
+         * Opening a folder can reveal descendants that are wider than
+         * the folder row itself. Wait for the subtree to finish
+         * rendering, then reveal the furthest-right visible name.
+         */
+        await nextTick()
+
+        await new Promise((resolve) => {
+            window.requestAnimationFrame(() => {
+                window.requestAnimationFrame(resolve)
+            })
+        })
+
+        const container =
+            fileTreeElement.value
+
+        const folderElement =
+            getTreeElementByPath(path)
+
+        if (!container || !folderElement) {
+            return
+        }
+
+        const reveal = () => {
+            const currentFolder =
+                getTreeElementByPath(path)
+
+            if (!currentFolder) {
+                return
+            }
+
+            const containerRect =
+                container.getBoundingClientRect()
+
+            const folderRect =
+                currentFolder.getBoundingClientRect()
+
+            /*
+             * Vertically keep the folder that was explicitly opened
+             * visible, without jumping to one of its descendants.
+             */
+            if (
+                folderRect.top <
+                containerRect.top
+            ) {
+                container.scrollTop -=
+                    containerRect.top -
+                    folderRect.top
+            } else if (
+                folderRect.bottom >
+                containerRect.bottom
+            ) {
+                container.scrollTop +=
+                    folderRect.bottom -
+                    containerRect.bottom
+            }
+
+            const names = [
+                ...currentFolder.querySelectorAll(
+                    '.tree-name',
+                ),
+            ]
+
+            let rightmostRect = null
+
+            for (const name of names) {
+                const rect =
+                    name.getBoundingClientRect()
+
+                if (
+                    !rightmostRect ||
+                    rect.right >
+                        rightmostRect.right
+                ) {
+                    rightmostRect = rect
+                }
+            }
+
+            if (!rightmostRect) {
+                const ownName =
+                    currentFolder.querySelector(
+                        ':scope > .tree-button .tree-name',
+                    )
+
+                rightmostRect =
+                    ownName
+                        ? ownName.getBoundingClientRect()
+                        : folderRect
+            }
+
+            const horizontalMargin = 12
+
+            const visibleRight =
+                containerRect.right -
+                horizontalMargin
+
+            if (
+                rightmostRect.right >
+                visibleRight
+            ) {
+                container.scrollLeft +=
+                    rightmostRect.right -
+                    visibleRight
+            }
+        }
+
+        reveal()
+
+        /*
+         * Recheck once the horizontal scrollbar has reacted to the
+         * newly visible subtree width.
+         */
+        await new Promise((resolve) => {
+            window.requestAnimationFrame(resolve)
+        })
+
+        reveal()
+    }
+
+    async function scrollTreePathIntoView(
+        path,
+        options = {},
+    ) {
+        const {
+            centerVertically = false,
+        } = options
+        /*
+         * Wait until folder expansion and intrinsic tree widths have
+         * reached their final layout before measuring.
+         */
+        await nextTick()
+
+        await new Promise((resolve) => {
+            window.requestAnimationFrame(() => {
+                window.requestAnimationFrame(resolve)
+            })
+        })
+
+        const container =
+            fileTreeElement.value
+
+        if (!container) {
+            return
+        }
+
+        const reveal = () => {
+            const element =
+                getTreeElementByPath(path)
+
+            if (!element) {
+                return
+            }
+
+            const containerRect =
+                container.getBoundingClientRect()
+
+            const elementRect =
+                element.getBoundingClientRect()
+
+            /*
+             * Vertical:
+             * - normal tree navigation only reveals the node;
+             * - search results are placed around the centre of the
+             *   visible tree, making the selected result much easier
+             *   to locate in a large tree.
+             */
+            if (centerVertically) {
+                const elementCenter =
+                    elementRect.top +
+                    elementRect.height / 2
+
+                const containerCenter =
+                    containerRect.top +
+                    containerRect.height / 2
+
+                container.scrollTop +=
+                    elementCenter -
+                    containerCenter
+            } else if (
+                elementRect.top <
+                containerRect.top
+            ) {
+                container.scrollTop -=
+                    containerRect.top -
+                    elementRect.top
+            } else if (
+                elementRect.bottom >
+                containerRect.bottom
+            ) {
+                container.scrollTop +=
+                    elementRect.bottom -
+                    containerRect.bottom
+            }
+
+            const row =
+                element.querySelector(
+                    ':scope > .tree-button',
+                ) ||
+                element.querySelector(
+                    '.tree-button',
+                ) ||
+                element
+
+            const name =
+                row.querySelector(
+                    '.tree-name',
+                )
+
+            const rowRect =
+                row.getBoundingClientRect()
+
+            const nameRect =
+                name
+                    ? name.getBoundingClientRect()
+                    : rowRect
+
+            const horizontalMargin = 12
+
+            const visibleLeft =
+                containerRect.left +
+                horizontalMargin
+
+            const visibleRight =
+                containerRect.right -
+                horizontalMargin
+
+            /*
+             * The right edge must be based on the real filename. This
+             * guarantees that a long name is fully visible, not merely
+             * the LI or button box.
+             */
+            if (
+                nameRect.right >
+                visibleRight
+            ) {
+                container.scrollLeft +=
+                    nameRect.right -
+                    visibleRight
+            } else if (
+                rowRect.left <
+                visibleLeft
+            ) {
+                container.scrollLeft -=
+                    visibleLeft -
+                    rowRect.left
+            }
+        }
+
+        reveal()
+
+        /*
+         * Re-measure after horizontal scrollbar/layout changes.
+         */
+        await new Promise((resolve) => {
+            window.requestAnimationFrame(resolve)
+        })
+
+        reveal()
+    }
+
+    async function revealTreePath(path) {
+        await ensureTreePathExpanded(path)
+        await scrollTreePathIntoView(path)
+    }
+
+    function getFileTreeScrollPosition() {
+        const element = fileTreeElement.value
+
+        return {
+            top: element
+                ? element.scrollTop
+                : 0,
+            left: element
+                ? element.scrollLeft
+                : 0,
+        }
+    }
+
+    async function restoreFileTreeScrollPosition(position) {
+        await nextTick()
+
+        const element = fileTreeElement.value
+
+        if (!element) {
+            return
+        }
+
+        element.scrollTop = position.top
+        element.scrollLeft = position.left
+
+        /*
+         * Some tree updates finish rendering one frame after nextTick().
+         * Restore once more on the next animation frame so a large tree
+         * does not jump after a mutation.
+         */
+        await new Promise((resolve) => {
+            window.requestAnimationFrame(resolve)
+        })
+
+        if (fileTreeElement.value) {
+            fileTreeElement.value.scrollTop = position.top
+            fileTreeElement.value.scrollLeft = position.left
+        }
+    }
+
+    async function refreshAfterContextMutation(
+        preserveTreeScroll = false,
+    ) {
         const expanded =
             new Set(expandedFolders.value)
 
+        const treeScrollPosition =
+            preserveTreeScroll
+                ? getFileTreeScrollPosition()
+                : null
+
         await loadRootTree(false)
         await restoreExpandedFolders(expanded)
+
+        if (treeScrollPosition !== null) {
+            await restoreFileTreeScrollPosition(
+                treeScrollPosition,
+            )
+        }
     }
 
     function buildWebDavUrl(path) {
@@ -3178,14 +3748,14 @@
         )
     }
 
-    function confirmContextMutation(path) {
+    async function confirmContextMutation(path) {
         if (
             !contextTargetAffectsSelection(path)
         ) {
             return true
         }
 
-        return confirmDiscardChanges()
+        return await confirmDiscardChanges()
     }
 
     const renameDialogVisible = ref(false)
@@ -3259,7 +3829,7 @@
             renameDialogError.value = 'The item must remain inside the Wiki Root.'
             return
         }
-        if (!confirmContextMutation(path)) return
+        if (!(await confirmContextMutation(path))) return
         renameDialogSubmitting.value = true
         let renamed = false
         try {
@@ -3285,15 +3855,341 @@
         } catch (err) {
             if (renamed) {
                 renameDialogSource.value = null
-                renameDialogError.value = 'The item was renamed, but the view could not be refreshed. Close this dialog and reload the page.'
+                renameDialogError.value =
+                    'The item was renamed, but the view could not be refreshed. Close this dialog and reload the page.'
+            } else if (
+                err?.status === 412 ||
+                err?.status === 409
+            ) {
+                renameDialogError.value =
+                    type === 'folder'
+                        ? 'A folder with that name already exists.'
+                        : 'A file with that name already exists.'
             } else {
-                renameDialogError.value = err.message || 'Unable to rename the item.'
+                renameDialogError.value =
+                    err.message ||
+                    'Unable to rename the item.'
             }
         } finally {
             renameDialogSubmitting.value = false
         }
     }
 
+
+
+    /*
+     * Drag and drop in the main file tree.
+     * Files and folders can be dragged, while only folders are
+     * accepted as destinations. Closed folders auto-expand after
+     * a short hover so nested destinations can be reached naturally.
+     */
+    const treeDragSource = ref(null)
+    const treeDragSourcePath = ref('')
+    const treeDropTargetPath = ref('')
+    const treeDropTargetValid = ref(false)
+    let treeDragExpandTimeout = null
+    let treeDragExpandPath = ''
+
+    function clearTreeDragExpandTimeout() {
+        if (treeDragExpandTimeout !== null) {
+            window.clearTimeout(treeDragExpandTimeout)
+            treeDragExpandTimeout = null
+        }
+
+        treeDragExpandPath = ''
+    }
+
+    function resetTreeDragState() {
+        clearTreeDragExpandTimeout()
+        treeDragSource.value = null
+        treeDragSourcePath.value = ''
+        treeDropTargetPath.value = ''
+        treeDropTargetValid.value = false
+    }
+
+    function canDropTreeNode(source, target) {
+        if (!source || !target || target.type !== 'folder') {
+            return false
+        }
+
+        const sourcePath = normalizePath(source.path)
+        const targetPath = normalizePath(target.path)
+        const sourceParent = getParentPath(sourcePath)
+
+        if (
+            !sourcePath ||
+            !targetPath ||
+            !isInsideWikiRoot(sourcePath) ||
+            !isInsideWikiRoot(targetPath)
+        ) {
+            return false
+        }
+
+        if (targetPath === sourceParent) {
+            return false
+        }
+
+        if (
+            source.type === 'folder' &&
+            (
+                targetPath === sourcePath ||
+                targetPath.startsWith(sourcePath + '/')
+            )
+        ) {
+            return false
+        }
+
+        return true
+    }
+
+    function scheduleTreeDragExpand(target) {
+        const path = normalizePath(target?.path)
+
+        if (
+            !path ||
+            target?.type !== 'folder' ||
+            expandedFolders.value.has(path) ||
+            treeDragExpandPath === path
+        ) {
+            return
+        }
+
+        clearTreeDragExpandTimeout()
+        treeDragExpandPath = path
+
+        treeDragExpandTimeout = window.setTimeout(async () => {
+            treeDragExpandTimeout = null
+
+            if (
+                treeDropTargetPath.value !== path ||
+                !treeDropTargetValid.value
+            ) {
+                treeDragExpandPath = ''
+                return
+            }
+
+            try {
+                await loadFolderChildren(target)
+
+                const next = new Set(expandedFolders.value)
+                next.add(path)
+                expandedFolders.value = next
+            } catch (err) {
+                showOperationMessage(
+                    err.message || 'Failed to open the destination folder.',
+                    'error',
+                )
+            } finally {
+                treeDragExpandPath = ''
+            }
+        }, 700)
+    }
+
+    function handleTreeDragStart(event, node) {
+        if (!node) return
+
+        closeContextMenu()
+        clearTreeDragExpandTimeout()
+
+        treeDragSource.value = node
+        treeDragSourcePath.value = normalizePath(node.path)
+        treeDropTargetPath.value = ''
+        treeDropTargetValid.value = false
+
+        if (event.dataTransfer) {
+            event.dataTransfer.effectAllowed = 'move'
+            event.dataTransfer.setData(
+                'text/plain',
+                treeDragSourcePath.value,
+            )
+        }
+    }
+
+    function handleTreeDragEnd() {
+        resetTreeDragState()
+    }
+
+    function handleTreeDragOver(event, target) {
+        const source = treeDragSource.value
+
+        if (!source || !target || target.type !== 'folder') {
+            return
+        }
+
+        event.preventDefault()
+        event.stopPropagation()
+
+        const targetPath = normalizePath(target.path)
+        const valid = canDropTreeNode(source, target)
+
+        if (treeDropTargetPath.value !== targetPath) {
+            clearTreeDragExpandTimeout()
+        }
+
+        treeDropTargetPath.value = targetPath
+        treeDropTargetValid.value = valid
+
+        if (event.dataTransfer) {
+            event.dataTransfer.dropEffect = valid ? 'move' : 'none'
+        }
+
+        if (valid) {
+            scheduleTreeDragExpand(target)
+        } else {
+            clearTreeDragExpandTimeout()
+        }
+    }
+
+    function getMovedSelectionPath(selectedPath, sourcePath, destination) {
+        const selected = normalizePath(selectedPath)
+        const source = normalizePath(sourcePath)
+
+        if (!selected || !source) return ''
+        if (selected === source) return destination
+
+        if (selected.startsWith(source + '/')) {
+            return destination + selected.slice(source.length)
+        }
+
+        return ''
+    }
+
+    async function handleTreeDrop(event, target) {
+        const source = treeDragSource.value
+
+        event.preventDefault()
+        event.stopPropagation()
+        clearTreeDragExpandTimeout()
+
+        if (!source || !target || target.type !== 'folder') {
+            resetTreeDragState()
+            return
+        }
+
+        const sourcePath = normalizePath(source.path)
+        const destinationFolder = normalizePath(target.path)
+        const sourceParent = getParentPath(sourcePath)
+
+        if (destinationFolder === sourceParent) {
+            resetTreeDragState()
+            return
+        }
+
+        if (!canDropTreeNode(source, target)) {
+            const invalidDescendant =
+                source.type === 'folder' &&
+                (
+                    destinationFolder === sourcePath ||
+                    destinationFolder.startsWith(sourcePath + '/')
+                )
+
+            resetTreeDragState()
+
+            if (invalidDescendant) {
+                showOperationMessage(
+                    'A folder cannot be moved into itself or one of its subfolders.',
+                    'error',
+                )
+            }
+
+            return
+        }
+
+        const name = getNameFromPath(sourcePath)
+        const destination = normalizePath(
+            destinationFolder + '/' + name,
+        )
+
+        const selectedFileBefore = normalizePath(selectedFile.value)
+        const selectedResourceBefore = selectedResource.value
+            ? normalizePath(selectedResource.value.path)
+            : ''
+
+        const movedSelectedFile = getMovedSelectionPath(
+            selectedFileBefore,
+            sourcePath,
+            destination,
+        )
+
+        const movedSelectedResource = getMovedSelectionPath(
+            selectedResourceBefore,
+            sourcePath,
+            destination,
+        )
+
+        resetTreeDragState()
+
+        if (!(await confirmContextMutation(sourcePath))) {
+            return
+        }
+
+        let moved = false
+
+        try {
+            const url = buildWebDavUrl(destination)
+
+            if (!url) {
+                throw new Error('Unable to build destination URL.')
+            }
+
+            await webDavRequest('MOVE', sourcePath, {
+                headers: {
+                    Destination: new URL(
+                        url,
+                        window.location.origin,
+                    ).href,
+                    Overwrite: 'F',
+                },
+            })
+
+            moved = true
+
+            if (contextTargetAffectsSelection(sourcePath)) {
+                clearContextSelection()
+            }
+
+            currentFolder.value = destinationFolder
+
+            await refreshAfterContextMutation(true)
+
+            if (movedSelectedFile) {
+                await openFile(movedSelectedFile)
+            } else if (movedSelectedResource) {
+                const movedNode = findNode(
+                    tree.value,
+                    movedSelectedResource,
+                )
+
+                if (movedNode) {
+                    selectResource(movedNode)
+                }
+            }
+
+            showOperationMessage(
+                `Moved "${name}" to "${getNameFromPath(destinationFolder)}".`,
+                'success',
+            )
+        } catch (err) {
+            if (moved) {
+                showOperationMessage(
+                    'The item was moved, but the file list could not be refreshed. Reload the page to update the tree.',
+                    'error',
+                )
+            } else if (err?.status === 412 || err?.status === 409) {
+                showOperationMessage(
+                    source.type === 'folder'
+                        ? 'A folder with that name already exists in the destination.'
+                        : 'A file with that name already exists in the destination.',
+                    'error',
+                )
+            } else {
+                showOperationMessage(
+                    err.message || 'Unable to move the item.',
+                    'error',
+                )
+            }
+        }
+    }
 
 
     const moveDialogVisible = ref(false)
@@ -3356,7 +4252,7 @@
             moveDialogError.value = 'A folder cannot be moved into itself or one of its subfolders.'
             return
         }
-        if (!confirmContextMutation(path)) return
+        if (!(await confirmContextMutation(path))) return
         const destination = normalizePath(destinationFolder + '/' + name)
         moveDialogSubmitting.value = true
         let moved = false
@@ -3645,7 +4541,7 @@
             return
         }
 
-        if (!confirmContextMutation(path)) {
+        if (!(await confirmContextMutation(path))) {
             return
         }
 
@@ -4378,7 +5274,7 @@
                             node.path,
                         )
                     } else {
-                        selectResource(node)
+                        await selectResource(node)
                     }
                     break
 
@@ -4594,7 +5490,7 @@
             return
         }
 
-        if (!confirmDiscardChanges()) {
+        if (!(await confirmDiscardChanges())) {
             return
         }
 
@@ -4940,6 +5836,10 @@
                 }
             }
 
+            await revealTreePath(
+                createdPath,
+            )
+
             closeCreateDialog(true)
         } catch (err) {
             createDialogError.value =
@@ -5050,6 +5950,8 @@
     }
 
     function selectSearchHistory(query) {
+        clearTreeDragExpandTimeout()
+
         if (searchTimeout !== null) {
             window.clearTimeout(searchTimeout)
             searchTimeout = null
@@ -5231,8 +6133,24 @@
             return
         }
 
+        const resultPath =
+            normalizePath(result.path)
+
         clearSearch()
-        await openFile(result.path)
+        await openFile(resultPath)
+
+        /*
+         * openFile() already expands the full path and reveals the
+         * selected file. Search navigation gets one extra pass so the
+         * result is positioned clearly inside the visible tree rather
+         * than merely touching its top/bottom edge.
+         */
+        await scrollTreePathIntoView(
+            resultPath,
+            {
+                centerVertically: true,
+            },
+        )
     }
 
     function getSearchResultDirectory(path) {
@@ -5268,20 +6186,51 @@
 
     /*
      * Ask whether it is safe to leave the current
-     * document.
+     * document using an integrated application dialog.
      */
-    function confirmDiscardChanges() {
+    const unsavedChangesDialogVisible = ref(false)
+    const unsavedChangesDialogElement = ref(null)
+    let unsavedChangesDialogResolve = null
+
+    async function confirmDiscardChanges() {
         if (!editing.value || !isDirty.value) {
             return true
         }
 
-        return window.confirm(
-            'You have unsaved changes. Discard them?',
-        )
+        if (unsavedChangesDialogVisible.value) {
+            return false
+        }
+
+        unsavedChangesDialogVisible.value = true
+
+        const result = await new Promise((resolve) => {
+            unsavedChangesDialogResolve = resolve
+
+            nextTick(() => {
+                unsavedChangesDialogElement.value?.focus()
+            })
+        })
+
+        return result
+    }
+
+    function resolveUnsavedChanges(discard) {
+        if (!unsavedChangesDialogVisible.value) {
+            return
+        }
+
+        unsavedChangesDialogVisible.value = false
+
+        const resolve = unsavedChangesDialogResolve
+        unsavedChangesDialogResolve = null
+
+        if (resolve) {
+            resolve(Boolean(discard))
+        }
     }
 
     async function openFolder(path) {
-        if (!confirmDiscardChanges()) {
+        if (!(await confirmDiscardChanges())) {
             return
         }
 
@@ -5339,8 +6288,8 @@
         }
     }
 
-    function selectResource(node) {
-        if (!confirmDiscardChanges()) {
+    async function selectResource(node) {
+        if (!(await confirmDiscardChanges())) {
             return
         }
 
@@ -5366,6 +6315,10 @@
 
         currentFolder.value =
             getParentPath(node.path)
+
+        await scrollTreePathIntoView(
+            node.path,
+        )
     }
 
     async function openFile(path) {
@@ -5378,7 +6331,7 @@
             return
         }
 
-        if (!confirmDiscardChanges()) {
+        if (!(await confirmDiscardChanges())) {
             return
         }
 
@@ -5398,7 +6351,7 @@
             node.type === 'file' &&
             node.fileType !== 'markdown'
         ) {
-            selectResource(node)
+            await selectResource(node)
             return
         }
 
@@ -5522,6 +6475,10 @@
             }
 
             expandedFolders.value = next
+
+            await scrollTreePathIntoView(
+                filePath,
+            )
         } catch (err) {
             fileError.value =
                 err.message
@@ -5559,13 +6516,8 @@
         selectedCodeLanguage.value = ''
     }
 
-    function cancelEditing() {
-        if (
-            isDirty.value &&
-            !window.confirm(
-                'Discard your unsaved changes?',
-            )
-        ) {
+    async function cancelEditing() {
+        if (!(await confirmDiscardChanges())) {
             return
         }
 
@@ -6769,7 +7721,7 @@
     }
 
     async function chooseWikiRoot() {
-        if (!confirmDiscardChanges()) {
+        if (!(await confirmDiscardChanges())) {
             return
         }
 
@@ -7243,6 +8195,21 @@
                 type: Object,
                 required: true,
             },
+
+            dragSourcePath: {
+                type: String,
+                default: '',
+            },
+
+            dropTargetPath: {
+                type: String,
+                default: '',
+            },
+
+            dropTargetValid: {
+                type: Boolean,
+                default: false,
+            },
         },
 
         emits: [
@@ -7250,6 +8217,10 @@
             'open-file',
             'select-resource',
             'context-menu',
+            'drag-start',
+            'drag-end',
+            'drag-over',
+            'drop',
         ],
 
         setup(props, { emit }) {
@@ -7325,6 +8296,10 @@
                     'li',
                     {
                         class: 'tree-item',
+                        'data-tree-path':
+                            normalizePath(
+                                props.node.path,
+                            ),
                     },
                     [
                         h(
@@ -7345,6 +8320,27 @@
                                             props.node.type ===
                                                 'folder' &&
                                             expanded,
+
+                                        'tree-button-dragging':
+                                            normalizePath(
+                                                props.dragSourcePath,
+                                            ) === nodePath,
+
+                                        'tree-button-drop-target-valid':
+                                            props.node.type ===
+                                                'folder' &&
+                                            normalizePath(
+                                                props.dropTargetPath,
+                                            ) === nodePath &&
+                                            props.dropTargetValid,
+
+                                        'tree-button-drop-target-invalid':
+                                            props.node.type ===
+                                                'folder' &&
+                                            normalizePath(
+                                                props.dropTargetPath,
+                                            ) === nodePath &&
+                                            !props.dropTargetValid,
                                     },
                                 ],
 
@@ -7353,6 +8349,40 @@
 
                                 'aria-label':
                                     props.node.name,
+
+                                draggable: true,
+
+                                onDragstart: (event) => {
+                                    emit(
+                                        'drag-start',
+                                        event,
+                                        props.node,
+                                    )
+                                },
+
+                                onDragend: (event) => {
+                                    emit(
+                                        'drag-end',
+                                        event,
+                                        props.node,
+                                    )
+                                },
+
+                                onDragover: (event) => {
+                                    emit(
+                                        'drag-over',
+                                        event,
+                                        props.node,
+                                    )
+                                },
+
+                                onDrop: (event) => {
+                                    emit(
+                                        'drop',
+                                        event,
+                                        props.node,
+                                    )
+                                },
 
                                 onClick: () => {
                                     if (
@@ -7465,6 +8495,15 @@
                                                 expandedFolders:
                                                     props.expandedFolders,
 
+                                                dragSourcePath:
+                                                    props.dragSourcePath,
+
+                                                dropTargetPath:
+                                                    props.dropTargetPath,
+
+                                                dropTargetValid:
+                                                    props.dropTargetValid,
+
                                                 onToggleFolder:
                                                     (
                                                         childNode,
@@ -7499,6 +8538,50 @@
                                                     ) =>
                                                         emit(
                                                             'context-menu',
+                                                            event,
+                                                            resourceNode,
+                                                        ),
+
+                                                onDragStart:
+                                                    (
+                                                        event,
+                                                        resourceNode,
+                                                    ) =>
+                                                        emit(
+                                                            'drag-start',
+                                                            event,
+                                                            resourceNode,
+                                                        ),
+
+                                                onDragEnd:
+                                                    (
+                                                        event,
+                                                        resourceNode,
+                                                    ) =>
+                                                        emit(
+                                                            'drag-end',
+                                                            event,
+                                                            resourceNode,
+                                                        ),
+
+                                                onDragOver:
+                                                    (
+                                                        event,
+                                                        resourceNode,
+                                                    ) =>
+                                                        emit(
+                                                            'drag-over',
+                                                            event,
+                                                            resourceNode,
+                                                        ),
+
+                                                onDrop:
+                                                    (
+                                                        event,
+                                                        resourceNode,
+                                                    ) =>
+                                                        emit(
+                                                            'drop',
                                                             event,
                                                             resourceNode,
                                                         ),

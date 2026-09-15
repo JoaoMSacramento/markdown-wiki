@@ -1,4 +1,3 @@
-
 .markdown-wiki {
 	display: flex;
 	width: 100%;
@@ -164,9 +163,9 @@
 	display: inline-flex !important;
 	align-items: center !important;
 	justify-content: center !important;
-	min-height: 36px !important;
-	margin-top: 12px !important;
-	padding: 7px 14px !important;
+	min-height: 32px !important;
+	margin-top: 10px !important;
+	padding: 5px 12px !important;
 	border: 0 !important;
 	border-radius: 8px !important;
 	background: var(--color-primary-element) !important;
@@ -174,7 +173,7 @@
 	color: var(--color-primary-element-text) !important;
 	cursor: pointer !important;
 	font: inherit !important;
-	font-size: 13px !important;
+	font-size: 12px !important;
 	font-weight: 600 !important;
 	line-height: 1.3 !important;
 	appearance: none !important;
@@ -211,12 +210,20 @@
  * File tree
  */
 
+.file-tree-section {
+	display: flex;
+	flex-direction: column;
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow: hidden;
+}
+
 .file-tree {
 	flex: 1 1 auto;
 	min-height: 0;
-	overflow-x: hidden;
+	overflow-x: auto;
 	overflow-y: auto;
-	padding: 10px 8px 12px;
+	padding: 4px 8px 12px;
 	scrollbar-width: thin;
 }
 
@@ -226,12 +233,15 @@
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
+	flex: 0 0 auto;
 	width: 100%;
 	min-width: 0;
-	min-height: 30px;
-	padding: 4px 8px 6px;
+	min-height: 42px;
+	padding: 6px 16px;
 	box-sizing: border-box;
 	overflow: visible;
+	border-bottom: 1px solid var(--color-border);
+	background: var(--color-background-hover);
 }
 
 .tree-header {
@@ -488,13 +498,21 @@
 }
 
 .tree-list {
+	display: block;
+	width: max-content;
+	min-width: 100%;
 	margin: 0;
 	padding: 0;
+	box-sizing: border-box;
 	list-style: none;
 }
 
 .tree-item {
+	display: block;
+	width: max-content;
+	min-width: 100%;
 	margin: 1px 0;
+	box-sizing: border-box;
 }
 
 /*
@@ -502,11 +520,13 @@
  */
 
 .tree-button {
-	display: flex;
+	display: inline-flex;
 	align-items: center;
-	width: 100%;
+	width: max-content;
+	min-width: 100%;
 	min-height: 34px;
 	padding: 5px 8px;
+	box-sizing: border-box;
 	border: 0 !important;
 	border-radius: var(--border-radius-element);
 	outline: none;
@@ -548,6 +568,39 @@
 .tree-button-folder-active {
 	background: var(--color-background-hover) !important;
 	font-weight: 600;
+}
+
+/*
+ * Tree drag and drop
+ */
+
+.tree-button[draggable="true"] {
+	cursor: grab;
+}
+
+.tree-button[draggable="true"]:active {
+	cursor: grabbing;
+}
+
+.tree-button-dragging {
+	opacity: 0.45;
+}
+
+.tree-button-drop-target-valid {
+	outline: 2px solid var(--color-primary-element) !important;
+	outline-offset: -2px;
+	background: var(--color-primary-element-light) !important;
+}
+
+.tree-button-drop-target-invalid {
+	outline: 2px solid var(--color-error) !important;
+	outline-offset: -2px;
+	background: color-mix(
+		in srgb,
+		var(--color-error) 12%,
+		transparent
+	) !important;
+	cursor: not-allowed !important;
 }
 
 /*
@@ -605,9 +658,13 @@
  */
 
 .tree-name {
-	min-width: 0;
-	overflow: hidden;
-	text-overflow: ellipsis;
+	display: inline-block;
+	flex: 0 0 auto;
+	width: max-content;
+	min-width: max-content;
+	max-width: none;
+	overflow: visible;
+	text-overflow: clip;
 	white-space: nowrap;
 }
 
@@ -882,35 +939,27 @@
 }
 
 .create-dialog-error {
-	flex: 0 0 auto;
-	margin-top: 10px;
+	display: flex;
+	align-items: flex-start;
+	gap: 8px;
+	margin-top: 12px;
 	padding: 10px 12px;
-	border: 1px solid var(--color-error);
-	border-left-width: 4px;
-	border-radius: 7px;
-	background: rgb(176 0 32 / 12%);
-	background: color-mix(
-		in srgb,
-		var(--color-error) 14%,
-		var(--color-main-background)
-	);
-	color: var(--color-error);
-	font-size: 13px;
+	box-sizing: border-box;
+	border: 1px solid #e9322d;
+	border-radius: 6px;
+	background: rgba(233, 50, 45, 0.16);
+	color: #ff6b66;
+	font-size: 14px;
 	font-weight: 600;
-	line-height: 1.45;
-	overflow-wrap: anywhere;
+	line-height: 1.4;
 }
 
-.create-dialog-footer {
-	display: flex;
-	align-items: center;
-	justify-content: flex-end;
+.create-dialog-error::before {
+	content: "⚠";
 	flex: 0 0 auto;
-	gap: 8px;
-	min-height: 62px;
-	padding: 12px 18px;
-	box-sizing: border-box;
-	border-top: 1px solid var(--color-border);
+	color: #ff6b66;
+	font-size: 15px;
+	line-height: 1.4;
 }
 
 .create-dialog-button {
@@ -958,6 +1007,18 @@
 .create-dialog-button:focus-visible {
 	outline: 2px solid var(--color-primary-element);
 	outline-offset: 2px;
+}
+
+@media (prefers-color-scheme: light) {
+	.create-dialog-error {
+		border-color: #c62828;
+		background: rgba(198, 40, 40, 0.08);
+		color: #b71c1c;
+	}
+
+	.create-dialog-error::before {
+		color: #b71c1c;
+	}
 }
 
 /*
@@ -2404,6 +2465,7 @@
 	line-height: 1.45;
 	-webkit-box-orient: vertical;
 	-webkit-line-clamp: 3;
+	line-clamp: 3;
 }
 
 /*
@@ -2521,6 +2583,18 @@
 /*
  * Create dialog responsive
  */
+
+.create-dialog-footer {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	flex: 0 0 auto;
+	gap: 8px;
+	min-height: 58px;
+	padding: 10px 18px;
+	box-sizing: border-box;
+	border-top: 1px solid var(--color-border);
+}
 
 @media (max-width: 600px) {
 	.create-dialog-backdrop {
@@ -2764,3 +2838,149 @@
 	}
 }
 
+/*
+ * Compact fixed tree toolbar.
+ * FILES/+ remain on the left and the filter switch remains fully visible.
+ */
+.tree-header-row {
+	gap: 6px;
+	padding-right: 10px;
+	padding-left: 10px;
+}
+
+.tree-header-left {
+	flex: 0 0 auto;
+	min-width: 0;
+	gap: 5px;
+}
+
+.tree-header-actions {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	flex: 1 1 auto;
+	min-width: 0;
+	gap: 2px;
+}
+
+.tree-filter-button {
+	flex: 0 1 auto;
+	min-width: 0;
+	padding-right: 9px !important;
+	padding-left: 9px !important;
+	white-space: nowrap;
+}
+
+.tree-filter-button + .tree-filter-button {
+	margin-left: 0;
+}
+
+/*
+ * Balanced fixed tree toolbar.
+ * FILES/+ use only their natural width; the Markdown/All files switch
+ * receives all remaining sidebar width and splits it evenly.
+ */
+.tree-header-row {
+	display: flex;
+	align-items: center;
+	width: 100%;
+	gap: 8px;
+	padding-right: 8px;
+	padding-left: 8px;
+	overflow: hidden;
+}
+
+.tree-header-left {
+	display: flex;
+	align-items: center;
+	flex: 0 0 auto;
+	width: auto;
+	min-width: 0;
+	gap: 5px;
+}
+
+.tree-header-actions {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+	flex: 1 1 0;
+	width: auto;
+	min-width: 0;
+	gap: 2px;
+}
+
+.tree-filter-button {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 100%;
+	min-width: 0;
+	max-width: none;
+	padding: 6px 5px !important;
+	box-sizing: border-box;
+	overflow: hidden;
+	text-align: center;
+	white-space: nowrap;
+}
+
+.tree-filter-button + .tree-filter-button {
+	margin-left: 0;
+}
+
+/*
+ * Fixed FILES toolbar sizing.
+ * These are the actual classes used by App.vue.
+ */
+.tree-header-row {
+	display: flex;
+	align-items: center;
+	justify-content: flex-start;
+	gap: 6px;
+	width: 100%;
+	min-width: 0;
+	padding: 6px 8px;
+	overflow: hidden;
+}
+
+.tree-header {
+	display: flex;
+	align-items: center;
+	flex: 0 0 auto;
+	min-width: 0;
+}
+
+.tree-view-toggle {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+	align-items: center;
+	flex: 1 1 0;
+	width: 0;
+	min-width: 0;
+	max-width: 100%;
+	margin-left: 0;
+	padding: 2px;
+	box-sizing: border-box;
+	overflow: hidden;
+}
+
+.tree-view-button {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 100%;
+	min-width: 0;
+	max-width: none;
+	min-height: 24px;
+	padding: 3px 4px;
+	box-sizing: border-box;
+	overflow: hidden;
+	text-align: center;
+	white-space: nowrap;
+}
+
+/*
+ * Symmetric horizontal spacing for the Markdown / All files selector.
+ */
+.tree-view-toggle {
+	padding-right: 5px;
+	padding-left: 5px;
+}
