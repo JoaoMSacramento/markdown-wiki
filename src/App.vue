@@ -1,5 +1,36 @@
 <template>
     <div class="markdown-wiki">
+        <Teleport to="body">
+            <Transition name="wiki-operation-message">
+                <div
+                    v-if="operationMessage"
+                    class="wiki-operation-message"
+                    :class="{
+                        'wiki-operation-message-success':
+                            operationMessageType === 'success',
+                        'wiki-operation-message-error':
+                            operationMessageType === 'error',
+                    }"
+                    role="status"
+                    aria-live="polite"
+                >
+                    <span class="wiki-operation-message-text">
+                        {{ operationMessage }}
+                    </span>
+
+                    <button
+                        type="button"
+                        class="wiki-operation-message-close"
+                        aria-label="Dismiss message"
+                        title="Dismiss"
+                        @click="closeOperationMessage"
+                    >
+                        ×
+                    </button>
+                </div>
+            </Transition>
+        </Teleport>
+
         <aside class="wiki-sidebar">
             <div class="sidebar-header">
                 <h1>Markdown Wiki</h1>
@@ -363,6 +394,7 @@
                         @toggle-folder="toggleFolder"
                         @open-file="openFile"
                         @select-resource="selectResource"
+                        @context-menu="openContextMenu"
                     />
                 </ul>
             </div>
@@ -1210,7 +1242,854 @@
                 </div>
             </div>
         </div>
+
+        <!--
+         * Rename dialog.
+         -->
+        <Teleport to="body">
+            <div
+                v-if="renameDialogVisible"
+                class="create-dialog-backdrop wiki-modal-backdrop"
+                @click.self="closeRenameDialog"
+            >
+                <div
+                    class="create-dialog"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="rename-dialog-title"
+                    tabindex="-1"
+                    @keydown.esc="closeRenameDialog"
+                >
+                    <div class="create-dialog-header">
+                        <h2
+                            id="rename-dialog-title"
+                            class="create-dialog-title"
+                        >
+                            Rename
+                        </h2>
+
+                        <button
+                            type="button"
+                            class="create-dialog-close"
+                            aria-label="Close"
+                            title="Close"
+                            :disabled="renameDialogSubmitting"
+                            @click="closeRenameDialog"
+                        >
+                            ×
+                        </button>
+                    </div>
+
+                    <div class="create-dialog-body">
+                        <label
+                            for="rename-dialog-name"
+                            class="create-dialog-label"
+                        >
+                            New name
+                        </label>
+
+                        <input
+                            id="rename-dialog-name"
+                            ref="renameDialogInput"
+                            v-model="renameDialogName"
+                            type="text"
+                            class="create-dialog-input"
+                            autocomplete="off"
+                            :disabled="renameDialogSubmitting"
+                            @keydown.enter.prevent="submitRenameDialog"
+                        />
+
+                        <div
+                            v-if="renameDialogError"
+                            class="create-dialog-error"
+                        >
+                            {{ renameDialogError }}
+                        </div>
+                    </div>
+
+                    <div class="create-dialog-footer">
+                        <button
+                            type="button"
+                            class="create-dialog-button create-dialog-button-secondary"
+                            :disabled="renameDialogSubmitting"
+                            @click="closeRenameDialog"
+                        >
+                            Cancel
+                        </button>
+
+                        <button
+                            type="button"
+                            class="create-dialog-button create-dialog-button-primary"
+                            :disabled="
+                                renameDialogSubmitting ||
+                                !renameDialogName.trim()
+                            "
+                            @click="submitRenameDialog"
+                        >
+                            {{
+                                renameDialogSubmitting
+                                    ? 'Renaming...'
+                                    : 'Rename'
+                            }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </Teleport>
+
+        <Teleport to="body">
+        <div
+            v-if="moveDialogVisible"
+            class="create-dialog-backdrop wiki-modal-backdrop"
+            @click.self="closeMoveDialog"
+        >
+            <div
+                class="create-dialog" ref="moveDialogElement"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="move-dialog-title"
+                tabindex="-1"
+                @keydown.esc="closeMoveDialog"
+            >
+                <div class="create-dialog-header">
+                    <h2 id="move-dialog-title">
+                        Move
+                    </h2>
+
+                    <button
+                        type="button"
+                        class="create-dialog-close"
+                        aria-label="Close"
+                        title="Close"
+                        :disabled="moveDialogSubmitting"
+                        @click="closeMoveDialog"
+                    >
+                        ×
+                    </button>
+                </div>
+
+                <div class="create-dialog-body">
+                    <p class="create-dialog-label">{{ moveDialogSource?.name }}</p>
+                    <div class="create-dialog-label">
+                        Move to
+                    </div>
+
+                    <div class="create-location-tree" :inert="moveDialogSubmitting || moveDialogLoading">
+                        <div
+                            class="create-location-row"
+                            :class="{
+                                'create-location-row-selected':
+                                    normalizePath(
+                                        moveDialogFolder,
+                                    ) ===
+                                    normalizePath(
+                                        wikiRoot,
+                                    ),
+                            }"
+                        >
+                            <span
+                                class="create-location-toggle create-location-toggle-placeholder"
+                            />
+
+                            <button
+                                type="button"
+                                class="create-location-select"
+                                @click="
+                                    selectMoveDialogFolder(
+                                        wikiRoot,
+                                    )
+                                "
+                            >
+                                <svg
+                                    class="create-location-icon"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-width="1.8"
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    aria-hidden="true"
+                                >
+                                    <path
+                                        d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"
+                                    />
+                                </svg>
+
+                                <span class="create-location-name">
+                                    {{ wikiRootName }}
+                                </span>
+                            </button>
+                        </div>
+
+                        <ul
+                            v-if="moveDialogFolders.length > 0"
+                            class="create-location-list"
+                        >
+                            <CreateLocationNode
+                                v-for="node in moveDialogFolders"
+                                :key="node.path"
+                                :node="node"
+                                :selected-path="moveDialogFolder"
+                                :expanded-folders="
+                                    moveDialogExpandedFolders
+                                "
+                                @toggle-folder="
+                                    toggleMoveDialogFolder
+                                "
+                                @select-folder="
+                                    selectMoveDialogFolder
+                                "
+                            />
+                        </ul>
+
+                        <div
+                            v-else
+                            class="create-location-empty"
+                        >
+                            No subfolders.
+                        </div>
+                    </div>
+
+                    <div
+                        v-if="moveDialogError"
+                        class="create-dialog-error"
+                    >
+                        {{ moveDialogError }}
+                    </div>
+                </div>
+
+                <div class="create-dialog-footer">
+                    <button
+                        type="button"
+                        class="create-dialog-button create-dialog-button-secondary"
+                        :disabled="moveDialogSubmitting"
+                        @click="closeMoveDialog"
+                    >
+                        Cancel
+                    </button>
+
+                    <button
+                        type="button"
+                        class="create-dialog-button create-dialog-button-primary"
+                        :disabled="
+                            moveDialogSubmitting ||
+                            !moveDialogFolder || moveDialogLoading || !moveDialogSource
+                        "
+                        @click="submitMoveDialog"
+                    >
+                        {{
+                            moveDialogSubmitting
+                                ? 'Moving...'
+                                : 'Move'
+                        }}
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        </Teleport>
+
+        <!--
+         * Delete dialog.
+         -->
+        <Teleport to="body">
+            <div
+                v-if="deleteDialogVisible"
+                class="create-dialog-backdrop wiki-modal-backdrop"
+                @click.self="closeDeleteDialog"
+            >
+                <div
+                    class="create-dialog delete-dialog"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="delete-dialog-title"
+                    tabindex="-1"
+                    @keydown.esc="closeDeleteDialog"
+                >
+                    <div class="create-dialog-header">
+                        <h2
+                            id="delete-dialog-title"
+                            class="create-dialog-title"
+                        >
+                            Delete
+                        </h2>
+
+                        <button
+                            type="button"
+                            class="create-dialog-close"
+                            aria-label="Close"
+                            title="Close"
+                            :disabled="deleteDialogSubmitting"
+                            @click="closeDeleteDialog"
+                        >
+                            ×
+                        </button>
+                    </div>
+
+                    <div class="create-dialog-body delete-dialog-body">
+                        <p class="delete-dialog-description">
+                            Are you sure you want to delete
+                            <strong>
+                                {{ deleteDialogSource?.name }}
+                            </strong>?
+                        </p>
+
+                        <p class="delete-dialog-warning">
+                            This action cannot be undone.
+                        </p>
+
+                        <div
+                            v-if="deleteDialogError"
+                            class="create-dialog-error"
+                        >
+                            {{ deleteDialogError }}
+                        </div>
+                    </div>
+
+                    <div class="create-dialog-footer">
+                        <button
+                            type="button"
+                            class="create-dialog-button create-dialog-button-secondary"
+                            :disabled="deleteDialogSubmitting"
+                            @click="closeDeleteDialog"
+                        >
+                            Cancel
+                        </button>
+
+                        <button
+                            type="button"
+                            class="create-dialog-button create-dialog-button-danger"
+                            :disabled="
+                                deleteDialogSubmitting ||
+                                !deleteDialogSource
+                            "
+                            @click="submitDeleteDialog"
+                        >
+                            {{
+                                deleteDialogSubmitting
+                                    ? 'Deleting...'
+                                    : 'Delete'
+                            }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </Teleport>
+
+        <!--
+        * File tree context menu.
+        -->
+        <div
+            v-if="contextMenuVisible"
+            ref="contextMenuElement"
+            class="tree-context-menu"
+            :style="contextMenuStyle"
+            role="menu"
+            @click.stop
+            @contextmenu.prevent.stop
+        >
+            <!-- Folder -->
+            <template v-if="contextMenuType === 'folder'">
+                <button
+                    type="button"
+                    class="tree-context-menu-item"
+                    role="menuitem"
+                    @click="handleContextMenuAction('open')"
+                >
+                    Open
+                </button>
+
+                <div
+                    class="tree-context-menu-separator"
+                    role="separator"
+                />
+
+                <button
+                    type="button"
+                    class="tree-context-menu-item"
+                    role="menuitem"
+                    @click="handleContextMenuAction('new-file')"
+                >
+                    New Markdown file
+                </button>
+
+                <button
+                    type="button"
+                    class="tree-context-menu-item"
+                    role="menuitem"
+                    @click="handleContextMenuAction('new-folder')"
+                >
+                    New folder
+                </button>
+
+                <button
+                    type="button"
+                    class="tree-context-menu-item"
+                    role="menuitem"
+                    @click="handleContextMenuAction('upload-file')"
+                >
+                    Upload file
+                </button>
+
+                <button
+                    type="button"
+                    class="tree-context-menu-item"
+                    role="menuitem"
+                    @click="handleContextMenuAction('upload-folder')"
+                >
+                    Upload folder
+                </button>
+
+                <div
+                    class="tree-context-menu-separator"
+                    role="separator"
+                />
+
+                <button
+                    type="button"
+                    class="tree-context-menu-item"
+                    role="menuitem"
+                    @click="handleContextMenuAction('rename')"
+                >
+                    Rename
+                </button>
+
+                <button
+                    type="button"
+                    class="tree-context-menu-item"
+                    role="menuitem"
+                    @click="handleContextMenuAction('copy-path')"
+                >
+                    Copy path
+                </button>
+
+                <button
+                    type="button"
+                    class="tree-context-menu-item"
+                    role="menuitem"
+                    @click="handleContextMenuAction('move')"
+                >
+                    Move
+                </button>
+
+                <button
+                    type="button"
+                    class="tree-context-menu-item"
+                    role="menuitem"
+                    @click="handleContextMenuAction('duplicate')"
+                >
+                    Duplicate
+                </button>
+
+                <button
+                    type="button"
+                    class="tree-context-menu-item"
+                    role="menuitem"
+                    @click="handleContextMenuAction('download')"
+                >
+                    Download
+                </button>
+
+                <div
+                    class="tree-context-menu-separator"
+                    role="separator"
+                />
+
+                <button
+                    type="button"
+                    class="tree-context-menu-item"
+                    role="menuitem"
+                    @click="handleContextMenuAction('properties')"
+                >
+                    Properties
+                </button>
+
+                <button
+                    type="button"
+                    class="tree-context-menu-item tree-context-menu-item-danger"
+                    role="menuitem"
+                    @click="handleContextMenuAction('delete')"
+                >
+                    Delete
+                </button>
+            </template>
+
+            <!-- Markdown file -->
+            <template v-else-if="contextMenuType === 'markdown'">
+                <button
+                    type="button"
+                    class="tree-context-menu-item"
+                    role="menuitem"
+                    @click="handleContextMenuAction('open')"
+                >
+                    Open
+                </button>
+
+                <button
+                    type="button"
+                    class="tree-context-menu-item"
+                    role="menuitem"
+                    @click="handleContextMenuAction('edit')"
+                >
+                    Open in editor
+                </button>
+
+                <div
+                    class="tree-context-menu-separator"
+                    role="separator"
+                />
+
+                <button
+                    type="button"
+                    class="tree-context-menu-item"
+                    role="menuitem"
+                    @click="handleContextMenuAction('rename')"
+                >
+                    Rename
+                </button>
+
+                <button
+                    type="button"
+                    class="tree-context-menu-item"
+                    role="menuitem"
+                    @click="handleContextMenuAction('copy-path')"
+                >
+                    Copy path
+                </button>
+
+                <button
+                    type="button"
+                    class="tree-context-menu-item"
+                    role="menuitem"
+                    @click="handleContextMenuAction('copy-markdown-link')"
+                >
+                    Copy Markdown link
+                </button>
+
+                <button
+                    type="button"
+                    class="tree-context-menu-item"
+                    role="menuitem"
+                    @click="handleContextMenuAction('move')"
+                >
+                    Move
+                </button>
+
+                <button
+                    type="button"
+                    class="tree-context-menu-item"
+                    role="menuitem"
+                    @click="handleContextMenuAction('duplicate')"
+                >
+                    Duplicate
+                </button>
+
+                <button
+                    type="button"
+                    class="tree-context-menu-item"
+                    role="menuitem"
+                    @click="handleContextMenuAction('download')"
+                >
+                    Download
+                </button>
+
+                <div
+                    class="tree-context-menu-separator"
+                    role="separator"
+                />
+
+                <button
+                    type="button"
+                    class="tree-context-menu-item"
+                    role="menuitem"
+                    @click="handleContextMenuAction('properties')"
+                >
+                    Properties
+                </button>
+
+                <button
+                    type="button"
+                    class="tree-context-menu-item tree-context-menu-item-danger"
+                    role="menuitem"
+                    @click="handleContextMenuAction('delete')"
+                >
+                    Delete
+                </button>
+            </template>
+
+            <!-- Other files -->
+            <template v-else>
+                <button
+                    type="button"
+                    class="tree-context-menu-item"
+                    role="menuitem"
+                    @click="handleContextMenuAction('open')"
+                >
+                    Open
+                </button>
+
+                <div
+                    class="tree-context-menu-separator"
+                    role="separator"
+                />
+
+                <button
+                    type="button"
+                    class="tree-context-menu-item"
+                    role="menuitem"
+                    @click="handleContextMenuAction('rename')"
+                >
+                    Rename
+                </button>
+
+                <button
+                    type="button"
+                    class="tree-context-menu-item"
+                    role="menuitem"
+                    @click="handleContextMenuAction('copy-path')"
+                >
+                    Copy path
+                </button>
+
+                <button
+                    type="button"
+                    class="tree-context-menu-item"
+                    role="menuitem"
+                    @click="handleContextMenuAction('move')"
+                >
+                    Move
+                </button>
+
+                <button
+                    type="button"
+                    class="tree-context-menu-item"
+                    role="menuitem"
+                    @click="handleContextMenuAction('duplicate')"
+                >
+                    Duplicate
+                </button>
+
+                <button
+                    type="button"
+                    class="tree-context-menu-item"
+                    role="menuitem"
+                    @click="handleContextMenuAction('download')"
+                >
+                    Download
+                </button>
+
+                <div
+                    class="tree-context-menu-separator"
+                    role="separator"
+                />
+
+                <button
+                    type="button"
+                    class="tree-context-menu-item"
+                    role="menuitem"
+                    @click="handleContextMenuAction('properties')"
+                >
+                    Properties
+                </button>
+
+                <button
+                    type="button"
+                    class="tree-context-menu-item tree-context-menu-item-danger"
+                    role="menuitem"
+                    @click="handleContextMenuAction('delete')"
+                >
+                    Delete
+                </button>
+            </template>
+        </div>
     </div>
+
+    <!-- Render outside the app layout so overflow cannot clip the dialog. -->
+    <Teleport to="body">
+    <!-- Properties dialog -->
+    <div
+        v-if="propertiesDialogVisible"
+        class="wiki-modal-backdrop"
+        @click.self="closePropertiesDialog"
+    >
+        <div
+            class="wiki-properties-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="properties-dialog-title"
+        >
+            <div class="wiki-properties-header">
+                <h2 id="properties-dialog-title">
+                    Properties
+                </h2>
+
+                <button
+                    type="button"
+                    class="wiki-properties-close"
+                    aria-label="Close"
+                    title="Close"
+                    @click="closePropertiesDialog"
+                >
+                    ×
+                </button>
+            </div>
+
+            <div class="wiki-properties-body">
+                <div
+                    v-if="propertiesDialogLoading"
+                    class="wiki-properties-status"
+                >
+                    Loading properties...
+                </div>
+
+                <div
+                    v-else-if="propertiesDialogError"
+                    class="wiki-properties-status wiki-properties-error"
+                >
+                    {{ propertiesDialogError }}
+                </div>
+
+                <div
+                    v-else-if="propertiesDialogData"
+                    class="wiki-properties-list"
+                >
+                    <div class="wiki-properties-row">
+                        <span class="wiki-properties-label">Name</span>
+                        <span
+                            class="wiki-properties-value"
+                            :title="propertiesDialogData.name"
+                        >
+                            {{ propertiesDialogData.name }}
+                        </span>
+                    </div>
+
+                    <div class="wiki-properties-row">
+                        <span class="wiki-properties-label">Type</span>
+                        <span class="wiki-properties-value">
+                            {{ propertiesDialogData.type }}
+                        </span>
+                    </div>
+
+                    <div
+                        v-if="propertiesDialogData.extension"
+                        class="wiki-properties-row"
+                    >
+                        <span class="wiki-properties-label">Extension</span>
+                        <span class="wiki-properties-value">
+                            {{ propertiesDialogData.extension }}
+                        </span>
+                    </div>
+
+                    <div class="wiki-properties-row">
+                        <span class="wiki-properties-label">Path</span>
+                        <span
+                            class="wiki-properties-value wiki-properties-path"
+                            :title="propertiesDialogData.path"
+                        >
+                            {{ propertiesDialogData.path }}
+                        </span>
+                    </div>
+
+                    <div
+                        v-if="propertiesDialogData.type !== 'Folder'"
+                        class="wiki-properties-row"
+                    >
+                        <span class="wiki-properties-label">Size</span>
+                        <span class="wiki-properties-value">
+                            {{
+                                propertiesDialogData.size === null
+                                    ? 'Unknown'
+                                    : formatFileSize(
+                                        propertiesDialogData.size,
+                                    )
+                            }}
+                        </span>
+                    </div>
+
+                    <template
+                        v-if="propertiesDialogData.type === 'Folder'"
+                    >
+                        <div class="wiki-properties-row">
+                            <span class="wiki-properties-label">Items</span>
+                            <span class="wiki-properties-value">
+                                {{ propertiesDialogData.items }}
+                            </span>
+                        </div>
+
+                        <div class="wiki-properties-row">
+                            <span class="wiki-properties-label">Folders</span>
+                            <span class="wiki-properties-value">
+                                {{ propertiesDialogData.folders }}
+                            </span>
+                        </div>
+
+                        <div class="wiki-properties-row">
+                            <span class="wiki-properties-label">Files</span>
+                            <span class="wiki-properties-value">
+                                {{ propertiesDialogData.files }}
+                            </span>
+                        </div>
+
+                        <div class="wiki-properties-row">
+                            <span class="wiki-properties-label">Total size</span>
+                            <span class="wiki-properties-value">
+                                {{
+                                    formatFileSize(
+                                        propertiesDialogData.totalSize,
+                                    )
+                                }}
+                            </span>
+                        </div>
+                    </template>
+
+                    <div
+                        v-if="propertiesDialogData.mimeType"
+                        class="wiki-properties-row"
+                    >
+                        <span class="wiki-properties-label">MIME type</span>
+                        <span class="wiki-properties-value">
+                            {{ propertiesDialogData.mimeType }}
+                        </span>
+                    </div>
+
+                    <div
+                        v-if="
+                            propertiesDialogData.modified ||
+                            propertiesDialogData.latestModified
+                        "
+                        class="wiki-properties-row"
+                    >
+                        <span class="wiki-properties-label">
+                            {{
+                                propertiesDialogData.type === 'Folder'
+                                    ? 'Latest modified'
+                                    : 'Modified'
+                            }}
+                        </span>
+                        <span class="wiki-properties-value">
+                            {{
+                                formatPropertiesDate(
+                                    propertiesDialogData.modified ||
+                                        propertiesDialogData.latestModified,
+                                )
+                            }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="wiki-properties-footer">
+                <button
+                    type="button"
+                    class="wiki-properties-button"
+                    @click="closePropertiesDialog"
+                >
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+    </Teleport>
 </template>
 
 <script setup>
@@ -1272,7 +2151,64 @@
     const copyError = ref('')
     const copiedResourcePath = ref(false)
 
+    /*
+     * App-level operation message.
+     */
+    const operationMessage = ref('')
+    const operationMessageType = ref('success')
+    let operationMessageTimeout = null
+
+    function showOperationMessage(
+        message,
+        type = 'success',
+    ) {
+        operationMessage.value = message
+        operationMessageType.value = type
+
+        if (operationMessageTimeout !== null) {
+            window.clearTimeout(
+                operationMessageTimeout,
+            )
+        }
+
+        operationMessageTimeout =
+            window.setTimeout(() => {
+                operationMessage.value = ''
+                operationMessageTimeout = null
+            }, 4000)
+    }
+
+    function closeOperationMessage() {
+        operationMessage.value = ''
+
+        if (operationMessageTimeout !== null) {
+            window.clearTimeout(
+                operationMessageTimeout,
+            )
+            operationMessageTimeout = null
+        }
+    }
+
     const expandedFolders = ref(new Set())
+
+    /*
+     * Context menu state.
+     */
+    const contextMenuVisible = ref(false)
+    const contextMenuType = ref('')
+    const contextMenuPath = ref('')
+    const contextMenuNode = ref(null)
+    const contextMenuX = ref(0)
+    const contextMenuY = ref(0)
+    const contextMenuElement = ref(null)
+
+    /*
+     * Properties dialog state.
+     */
+    const propertiesDialogVisible = ref(false)
+    const propertiesDialogLoading = ref(false)
+    const propertiesDialogError = ref('')
+    const propertiesDialogData = ref(null)
 
     /*
      * Editor state.
@@ -1791,12 +2727,1781 @@
     }
 
     /*
+     * Context menu.
+     */
+    const contextMenuStyle = computed(() => ({
+        left: `${contextMenuX.value}px`,
+        top: `${contextMenuY.value}px`,
+    }))
+
+    function getContextMenuType(node) {
+        if (node.type === 'folder') {
+            return 'folder'
+        }
+
+        if (node.fileType === 'markdown') {
+            return 'markdown'
+        }
+
+        return 'file'
+    }
+
+    async function openContextMenu(event, node) {
+        event.preventDefault()
+        event.stopPropagation()
+
+        closeCreateMenu()
+
+        contextMenuNode.value = node
+        contextMenuPath.value =
+            normalizePath(node.path)
+        contextMenuType.value =
+            getContextMenuType(node)
+
+        contextMenuX.value = event.clientX
+        contextMenuY.value = event.clientY
+        contextMenuVisible.value = true
+
+        await nextTick()
+
+        positionContextMenu()
+    }
+
+    function positionContextMenu() {
+        const menu =
+            contextMenuElement.value
+
+        if (!menu) {
+            return
+        }
+
+        const padding = 8
+
+        const menuWidth = menu.offsetWidth
+        const menuHeight = menu.offsetHeight
+
+        const viewportWidth =
+            window.innerWidth
+
+        const viewportHeight =
+            window.innerHeight
+
+        let x = contextMenuX.value
+        let y = contextMenuY.value
+
+        if (
+            x + menuWidth >
+            viewportWidth - padding
+        ) {
+            x =
+                viewportWidth -
+                menuWidth -
+                padding
+        }
+
+        if (
+            y + menuHeight >
+            viewportHeight - padding
+        ) {
+            y =
+                viewportHeight -
+                menuHeight -
+                padding
+        }
+
+        x = Math.max(
+            padding,
+            x,
+        )
+
+        y = Math.max(
+            padding,
+            y,
+        )
+
+        contextMenuX.value = x
+        contextMenuY.value = y
+    }
+
+    function closeContextMenu() {
+        contextMenuVisible.value = false
+        contextMenuType.value = ''
+        contextMenuPath.value = ''
+        contextMenuNode.value = null
+    }
+
+    function clearContextSelection() {
+        selectedFile.value = ''
+        selectedResource.value = null
+        markdown.value = ''
+        editedMarkdown.value = ''
+        fileError.value = ''
+        saveError.value = ''
+        copyError.value = ''
+        copiedResourcePath.value = false
+        editing.value = false
+    }
+
+    async function refreshAfterContextMutation() {
+        const expanded =
+            new Set(expandedFolders.value)
+
+        await loadRootTree(false)
+        await restoreExpandedFolders(expanded)
+    }
+
+    function buildWebDavUrl(path) {
+        return buildDavUrl(path)
+    }
+
+    async function webDavRequest(
+        method,
+        path,
+        options = {},
+    ) {
+        const davUrl =
+            buildWebDavUrl(path)
+
+        if (!davUrl) {
+            throw new Error(
+                'Invalid path.',
+            )
+        }
+
+        const headers = {
+            ...(options.headers || {}),
+        }
+
+        if (OC.requestToken) {
+            headers.requesttoken =
+                OC.requestToken
+        }
+
+        const response = await fetch(
+            davUrl,
+            {
+                method,
+                headers,
+                body:
+                    options.body ||
+                    undefined,
+            },
+        )
+
+        if (!response.ok) {
+            let message =
+                `${method} failed (${response.status}).`
+
+            try {
+                const text =
+                    await response.text()
+
+                const match =
+                    text.match(
+                        /<d:error[^>]*>[\s\S]*?<d:responsedescription>([\s\S]*?)<\/d:responsedescription>/i,
+                    )
+
+                if (match && match[1]) {
+                    message =
+                        match[1]
+                            .replace(
+                                /<[^>]+>/g,
+                                '',
+                            )
+                            .trim()
+                }
+            } catch {
+                // Keep the HTTP status message.
+            }
+
+            const error =
+                new Error(message)
+
+            error.status =
+                response.status
+
+            throw error
+        }
+
+        return response
+    }
+
+    function getContextTargetPath() {
+        return normalizePath(
+            contextMenuPath.value,
+        )
+    }
+
+    function getContextTargetName() {
+        return getNameFromPath(
+            getContextTargetPath(),
+        )
+    }
+
+    function getContextTargetParent() {
+        return getParentPath(
+            getContextTargetPath(),
+        )
+    }
+
+    function getRelativeWikiPath(path) {
+        return getResourceRelativePath(path)
+    }
+
+    function resolveContextFolderInput(
+        value,
+    ) {
+        const root =
+            normalizePath(
+                wikiRoot.value,
+            )
+
+        const input =
+            String(value || '')
+                .trim()
+
+        if (
+            !input ||
+            input === '.'
+        ) {
+            return root
+        }
+
+        const relative =
+            input
+                .replaceAll('\\', '/')
+                .split('/')
+                .filter(Boolean)
+
+        const parts = []
+
+        for (const part of relative) {
+            if (
+                part === '.' ||
+                part === ''
+            ) {
+                continue
+            }
+
+            if (part === '..') {
+                if (parts.length === 0) {
+                    throw new Error(
+                        'Destination is outside the Wiki Root.',
+                    )
+                }
+
+                parts.pop()
+                continue
+            }
+
+            parts.push(part)
+        }
+
+        const result =
+            normalizePath(
+                root +
+                    '/' +
+                    parts.join('/'),
+            )
+
+        if (!isInsideWikiRoot(result)) {
+            throw new Error(
+                'Destination is outside the Wiki Root.',
+            )
+        }
+
+        return result
+    }
+
+    function validateContextName(name) {
+        const value =
+            String(name || '').trim()
+
+        if (!value) {
+            throw new Error(
+                'Name cannot be empty.',
+            )
+        }
+
+        if (
+            value === '.' ||
+            value === '..' ||
+            value.includes('/') ||
+            value.includes('\\')
+        ) {
+            throw new Error(
+                'Name contains invalid characters.',
+            )
+        }
+
+        return value
+    }
+
+    function preserveMarkdownExtension(
+        name,
+        originalName,
+    ) {
+        const value =
+            validateContextName(name)
+
+        if (
+            originalName
+                .toLowerCase()
+                .endsWith('.md') &&
+            !value
+                .toLowerCase()
+                .endsWith('.md')
+        ) {
+            return value + '.md'
+        }
+
+        return value
+    }
+
+    async function copyToClipboard(
+        value,
+        successMessage = 'Copied.',
+    ) {
+        try {
+            if (
+                navigator.clipboard &&
+                navigator.clipboard.writeText
+            ) {
+                await navigator.clipboard.writeText(
+                    value,
+                )
+            } else {
+                const textarea =
+                    document.createElement('textarea')
+
+                textarea.value = value
+                textarea.style.position = 'fixed'
+                textarea.style.opacity = '0'
+
+                document.body.appendChild(
+                    textarea,
+                )
+
+                textarea.focus()
+                textarea.select()
+
+                const copied =
+                    document.execCommand(
+                        'copy',
+                    )
+
+                textarea.remove()
+
+                if (!copied) {
+                    throw new Error()
+                }
+            }
+
+            showOperationMessage(
+                successMessage,
+                'success',
+            )
+        } catch {
+            throw new Error(
+                'Failed to copy to clipboard.',
+            )
+        }
+    }
+
+    function getMarkdownLinkForPath(
+        path,
+    ) {
+        const targetPath =
+            normalizePath(path)
+
+        let baseDirectory =
+            normalizePath(
+                wikiRoot.value,
+            )
+
+        if (selectedFile.value) {
+            baseDirectory =
+                getParentPath(
+                    selectedFile.value,
+                )
+        }
+
+        const relative =
+            getRelativePath(
+                baseDirectory,
+                targetPath,
+            )
+
+        const name =
+            getNameFromPath(
+                targetPath,
+            )
+
+        return `[${name}](${encodeURI(relative)})`
+    }
+
+    function contextTargetAffectsSelection(path) {
+        const selectedFilePath =
+            normalizePath(
+                selectedFile.value,
+            )
+
+        const selectedResourcePath =
+            selectedResource.value
+                ? normalizePath(
+                    selectedResource.value.path,
+                )
+                : ''
+
+        const target =
+            normalizePath(path)
+
+        return (
+            (
+                selectedFilePath &&
+                (
+                    selectedFilePath === target ||
+                    selectedFilePath.startsWith(
+                        target + '/',
+                    )
+                )
+            ) ||
+            (
+                selectedResourcePath &&
+                (
+                    selectedResourcePath === target ||
+                    selectedResourcePath.startsWith(
+                        target + '/',
+                    )
+                )
+            )
+        )
+    }
+
+    function confirmContextMutation(path) {
+        if (
+            !contextTargetAffectsSelection(path)
+        ) {
+            return true
+        }
+
+        return confirmDiscardChanges()
+    }
+
+    const renameDialogVisible = ref(false)
+    const renameDialogSubmitting = ref(false)
+    const renameDialogError = ref('')
+    const renameDialogName = ref('')
+    const renameDialogSource = ref(null)
+    const renameDialogInput = ref(null)
+
+    /*
+     * Delete dialog state.
+     */
+    const deleteDialogVisible = ref(false)
+    const deleteDialogSubmitting = ref(false)
+    const deleteDialogError = ref('')
+    const deleteDialogSource = ref(null)
+
+    async function renameContextTarget() {
+        const node = contextMenuNode.value
+        if (!node || renameDialogVisible.value) return
+        renameDialogSource.value = {
+            path: getContextTargetPath(),
+            parent: getContextTargetParent(),
+            name: getContextTargetName(),
+            type: node.type,
+            fileType: node.fileType,
+        }
+        renameDialogName.value = renameDialogSource.value.name
+        renameDialogError.value = ''
+        renameDialogVisible.value = true
+        closeContextMenu()
+        await nextTick()
+        const input = renameDialogInput.value
+        if (input) {
+            input.focus()
+            const dot = renameDialogName.value.lastIndexOf('.')
+            const end = node.type === 'file' && dot > 0
+                ? dot : renameDialogName.value.length
+            input.setSelectionRange(0, end)
+        }
+    }
+
+    function closeRenameDialog() {
+        if (renameDialogSubmitting.value) return
+        renameDialogVisible.value = false
+        renameDialogSource.value = null
+        renameDialogError.value = ''
+        renameDialogName.value = ''
+    }
+
+    async function submitRenameDialog() {
+        if (renameDialogSubmitting.value || !renameDialogSource.value) return
+        const source = renameDialogSource.value
+        const { path, parent, name, type, fileType } = source
+        renameDialogError.value = ''
+        let newName
+        try {
+            newName = type === 'file' && fileType === 'markdown'
+                ? preserveMarkdownExtension(renameDialogName.value, name)
+                : validateContextName(renameDialogName.value)
+        } catch (err) {
+            renameDialogError.value = err.message || 'Invalid name.'
+            return
+        }
+        if (newName === name) {
+            closeRenameDialog()
+            return
+        }
+        const destination = normalizePath(parent + '/' + newName)
+        if (!isInsideWikiRoot(path) || !isInsideWikiRoot(destination)) {
+            renameDialogError.value = 'The item must remain inside the Wiki Root.'
+            return
+        }
+        if (!confirmContextMutation(path)) return
+        renameDialogSubmitting.value = true
+        let renamed = false
+        try {
+            const url = buildWebDavUrl(destination)
+            if (!url) throw new Error('Unable to build destination URL.')
+            const wasAffected = contextTargetAffectsSelection(path)
+            const wasSelectedMarkdown = normalizePath(selectedFile.value) === path
+                && type === 'file' && fileType === 'markdown'
+            await webDavRequest('MOVE', path, { headers: {
+                Destination: new URL(url, window.location.origin).href,
+                Overwrite: 'F',
+            } })
+            renamed = true
+            if (wasAffected) {
+                clearContextSelection()
+                currentFolder.value = parent
+            }
+            await refreshAfterContextMutation()
+            if (wasSelectedMarkdown) await openFile(destination)
+            renameDialogVisible.value = false
+            renameDialogSource.value = null
+            renameDialogName.value = ''
+        } catch (err) {
+            if (renamed) {
+                renameDialogSource.value = null
+                renameDialogError.value = 'The item was renamed, but the view could not be refreshed. Close this dialog and reload the page.'
+            } else {
+                renameDialogError.value = err.message || 'Unable to rename the item.'
+            }
+        } finally {
+            renameDialogSubmitting.value = false
+        }
+    }
+
+
+
+    const moveDialogVisible = ref(false)
+    const moveDialogSubmitting = ref(false)
+    const moveDialogLoading = ref(false)
+    const moveDialogError = ref('')
+    const moveDialogFolder = ref('')
+    const moveDialogSource = ref(null)
+    const moveDialogElement = ref(null)
+    const moveDialogExpandedFolders = ref(new Set())
+    const moveDialogFolders = computed(() => tree.value.filter(node => node.type === 'folder'))
+    let moveDialogRequest = 0
+
+    async function moveContextTarget() {
+        const node = contextMenuNode.value
+        if (!node || moveDialogVisible.value) return
+        const path = getContextTargetPath()
+        const parent = getContextTargetParent()
+        moveDialogSource.value = { path, parent, name: getNameFromPath(path), type: node.type }
+        moveDialogError.value = ''
+        moveDialogFolder.value = parent
+        moveDialogExpandedFolders.value = new Set()
+        moveDialogLoading.value = true
+        moveDialogVisible.value = true
+        const request = ++moveDialogRequest
+        closeContextMenu()
+        await nextTick()
+        moveDialogElement.value?.focus()
+        try {
+            await prepareMoveDialogTree(parent)
+        } catch (err) {
+            if (request === moveDialogRequest) moveDialogError.value = err.message || 'Failed to load folders.'
+        } finally {
+            if (request === moveDialogRequest) moveDialogLoading.value = false
+        }
+    }
+
+    function closeMoveDialog() {
+        if (moveDialogSubmitting.value || moveDialogLoading.value) return
+        moveDialogVisible.value = false
+        moveDialogSource.value = null
+        moveDialogError.value = ''
+        moveDialogRequest++
+    }
+
+    async function submitMoveDialog() {
+        if (moveDialogSubmitting.value || moveDialogLoading.value || !moveDialogSource.value) return
+        const { path, parent, name, type } = moveDialogSource.value
+        const destinationFolder = normalizePath(moveDialogFolder.value)
+        moveDialogError.value = ''
+        if (!isInsideWikiRoot(path) || !isInsideWikiRoot(destinationFolder)) {
+            moveDialogError.value = 'The destination must be inside the Wiki Root.'
+            return
+        }
+        if (destinationFolder === parent) {
+            moveDialogError.value = 'The item is already in that folder.'
+            return
+        }
+        if (type === 'folder' && (destinationFolder === path || destinationFolder.startsWith(path + '/'))) {
+            moveDialogError.value = 'A folder cannot be moved into itself or one of its subfolders.'
+            return
+        }
+        if (!confirmContextMutation(path)) return
+        const destination = normalizePath(destinationFolder + '/' + name)
+        moveDialogSubmitting.value = true
+        let moved = false
+        try {
+            const url = buildWebDavUrl(destination)
+            if (!url) throw new Error('Unable to build destination URL.')
+            await webDavRequest('MOVE', path, { headers: {
+                Destination: new URL(url, window.location.origin).href,
+                Overwrite: 'F',
+            } })
+            moved = true
+            if (contextTargetAffectsSelection(path)) {
+                clearContextSelection()
+                currentFolder.value = destinationFolder
+            }
+            await refreshAfterContextMutation()
+            moveDialogVisible.value = false
+            moveDialogSource.value = null
+        } catch (err) {
+            if (moved) {
+                moveDialogSource.value = null
+                moveDialogError.value = 'The item was moved, but the file list could not be refreshed. Close this dialog and reload the page.'
+            } else {
+                moveDialogError.value = err.message || 'Unable to move the item.'
+            }
+        } finally {
+            moveDialogSubmitting.value = false
+        }
+    }
+
+    async function prepareMoveDialogTree(
+        selectedPath,
+    ) {
+        const root =
+            normalizePath(
+                wikiRoot.value,
+            )
+
+        const target =
+            normalizePath(
+                selectedPath || root,
+            )
+
+        moveDialogFolder.value = target
+
+        const expanded =
+            new Set([root])
+
+        if (
+            target !== root &&
+            target.startsWith(root + '/')
+        ) {
+            const relativeParts =
+                target
+                    .slice(root.length + 1)
+                    .split('/')
+                    .filter(Boolean)
+
+            let currentPath = root
+
+            for (const part of relativeParts) {
+                currentPath =
+                    normalizePath(
+                        currentPath +
+                            '/' +
+                            part,
+                    )
+
+                const node =
+                    findNode(
+                        tree.value,
+                        currentPath,
+                    )
+
+                if (
+                    !node ||
+                    node.type !== 'folder'
+                ) {
+                    break
+                }
+
+                await loadFolderChildren(node)
+
+                expanded.add(currentPath)
+            }
+        }
+
+        moveDialogExpandedFolders.value =
+            expanded
+    }
+
+    function selectMoveDialogFolder(
+        path,
+    ) {
+        if (moveDialogSubmitting.value || moveDialogLoading.value) return
+        const normalizedPath =
+            normalizePath(path)
+
+        if (
+            !isInsideWikiRoot(
+                normalizedPath,
+            )
+        ) {
+            return
+        }
+
+        moveDialogFolder.value =
+            normalizedPath
+    }
+
+    async function toggleMoveDialogFolder(node) {
+        if (moveDialogSubmitting.value || moveDialogLoading.value) return
+        const path = normalizePath(node.path)
+
+        if (moveDialogExpandedFolders.value.has(path)) {
+            const next = new Set(moveDialogExpandedFolders.value)
+            next.delete(path)
+            moveDialogExpandedFolders.value = next
+            return
+        }
+
+        try {
+            await loadFolderChildren(node, true)
+
+            const next = new Set(moveDialogExpandedFolders.value)
+            next.add(path)
+            moveDialogExpandedFolders.value = next
+        } catch (err) {
+            moveDialogError.value =
+                err.message || 'Failed to load folder contents.'
+        }
+    }
+
+    function getDuplicateName(
+        originalName,
+        attempt,
+    ) {
+        const suffix =
+            attempt === 0
+                ? ' (copy)'
+                : ` (copy ${attempt + 1})`
+
+        const lastDot =
+            originalName.lastIndexOf('.')
+
+        if (
+            lastDot > 0 &&
+            lastDot < originalName.length - 1
+        ) {
+            return (
+                originalName.slice(0, lastDot) +
+                suffix +
+                originalName.slice(lastDot)
+            )
+        }
+
+        return originalName + suffix
+    }
+
+    async function duplicateContextTarget() {
+        const path =
+            getContextTargetPath()
+
+        const node =
+            contextMenuNode.value
+
+        if (!node) {
+            return
+        }
+
+        const parent =
+            getContextTargetParent()
+
+        let lastError = null
+
+        for (
+            let attempt = 0;
+            attempt < 20;
+            attempt++
+        ) {
+            const name =
+                getDuplicateName(
+                    getContextTargetName(),
+                    attempt,
+                )
+
+            const destination =
+                normalizePath(
+                    parent + '/' + name,
+                )
+
+            try {
+                await webDavRequest(
+                    'COPY',
+                    path,
+                    {
+                        headers: {
+                            Destination:
+                                new URL(
+                                    buildWebDavUrl(
+                                        destination,
+                                    ),
+                                    window.location.origin,
+                                ).href,
+                            Overwrite: 'F',
+                        },
+                    },
+                )
+
+                await refreshAfterContextMutation()
+                currentFolder.value = parent
+                return
+            } catch (err) {
+                lastError = err
+            }
+        }
+
+        throw lastError ||
+            new Error(
+                'Failed to duplicate item.',
+            )
+    }
+
+    async function deleteContextTarget() {
+        const node =
+            contextMenuNode.value
+
+        if (
+            !node ||
+            deleteDialogVisible.value
+        ) {
+            return
+        }
+
+        const path =
+            getContextTargetPath()
+
+        deleteDialogSource.value = {
+            path,
+            parent:
+                getContextTargetParent(),
+            name:
+                getContextTargetName(),
+            type: node.type,
+            fileType: node.fileType,
+        }
+
+        deleteDialogError.value = ''
+        deleteDialogVisible.value = true
+
+        closeContextMenu()
+    }
+
+    function closeDeleteDialog() {
+        if (deleteDialogSubmitting.value) {
+            return
+        }
+
+        deleteDialogVisible.value = false
+        deleteDialogSource.value = null
+        deleteDialogError.value = ''
+    }
+
+    async function submitDeleteDialog() {
+        if (
+            deleteDialogSubmitting.value ||
+            !deleteDialogSource.value
+        ) {
+            return
+        }
+
+        const source =
+            deleteDialogSource.value
+
+        const {
+            path,
+            parent,
+        } = source
+
+        deleteDialogError.value = ''
+
+        if (!isInsideWikiRoot(path)) {
+            deleteDialogError.value =
+                'The item must be inside the Wiki Root.'
+
+            return
+        }
+
+        if (!confirmContextMutation(path)) {
+            return
+        }
+
+        const wasAffected =
+            contextTargetAffectsSelection(
+                path,
+            )
+
+        deleteDialogSubmitting.value = true
+
+        let deleted = false
+
+        try {
+            await webDavRequest(
+                'DELETE',
+                path,
+            )
+
+            deleted = true
+
+            if (wasAffected) {
+                clearContextSelection()
+                currentFolder.value = parent
+            }
+
+            await refreshAfterContextMutation()
+
+            deleteDialogVisible.value = false
+            deleteDialogSource.value = null
+            deleteDialogError.value = ''
+        } catch (err) {
+            if (deleted) {
+                deleteDialogSource.value = null
+                deleteDialogError.value =
+                    'The item was deleted, but the view could not be refreshed. Close this dialog and reload the page.'
+            } else {
+                deleteDialogError.value =
+                    err.message ||
+                    'Unable to delete the item.'
+            }
+        } finally {
+            deleteDialogSubmitting.value = false
+        }
+    }
+
+    function downloadContextTarget() {
+        const path =
+            getContextTargetPath()
+
+        const davUrl =
+            buildWebDavUrl(path)
+
+        if (!davUrl) {
+            throw new Error(
+                'Unable to build download URL.',
+            )
+        }
+
+        const link =
+            document.createElement('a')
+
+        link.href = davUrl
+        link.download =
+            getContextTargetName()
+        link.target = '_blank'
+        link.rel = 'noopener'
+
+        document.body.appendChild(link)
+        link.click()
+        link.remove()
+    }
+
+    function formatFileSize(bytes) {
+        const size = Number(bytes)
+
+        if (!Number.isFinite(size) || size < 0) {
+            return 'Unknown'
+        }
+
+        if (size < 1024) {
+            return `${size} B`
+        }
+
+        const units = [
+            'KB',
+            'MB',
+            'GB',
+            'TB',
+        ]
+
+        let value = size / 1024
+        let unitIndex = 0
+
+        while (
+            value >= 1024 &&
+            unitIndex < units.length - 1
+        ) {
+            value /= 1024
+            unitIndex++
+        }
+
+        const decimals =
+            value >= 100
+                ? 0
+                : value >= 10
+                    ? 1
+                    : 2
+
+        return `${value.toFixed(decimals)} ${units[unitIndex]}`
+    }
+
+    function formatPropertiesDate(value) {
+        if (!value) {
+            return 'Unknown'
+        }
+
+        const date = new Date(value)
+
+        if (Number.isNaN(date.getTime())) {
+            return 'Unknown'
+        }
+
+        return new Intl.DateTimeFormat(
+            'en-GB',
+            {
+                dateStyle: 'medium',
+                timeStyle: 'short',
+            },
+        ).format(date)
+    }
+
+    function getDavResourceElements(xmlText) {
+        const parser = new DOMParser()
+        const xml = parser.parseFromString(
+            xmlText,
+            'application/xml',
+        )
+
+        if (
+            xml.querySelector('parsererror')
+        ) {
+            throw new Error(
+                'Unable to read file properties.',
+            )
+        }
+
+        return [
+            ...xml.getElementsByTagNameNS(
+                'DAV:',
+                'response',
+            ),
+        ]
+    }
+
+    function getDavChildText(element, localName) {
+        const child =
+            element.getElementsByTagNameNS(
+                'DAV:',
+                localName,
+            )[0]
+
+        return child?.textContent?.trim() || ''
+    }
+
+    function isDavCollection(element) {
+        return Boolean(
+            element.getElementsByTagNameNS(
+                'DAV:',
+                'collection',
+            )[0],
+        )
+    }
+
+    function getDavResponseHref(element) {
+        return getDavChildText(
+            element,
+            'href',
+        )
+    }
+
+    function getDavResponsePath(
+        element,
+        fallbackPath,
+    ) {
+        const href =
+            getDavResponseHref(element)
+
+        if (!href) {
+            return fallbackPath
+        }
+
+        try {
+            const url =
+                new URL(
+                    href,
+                    window.location.origin,
+                )
+
+            const davBase =
+                new URL(
+                    buildWebDavUrl(
+                        wikiRoot.value,
+                    ),
+                    window.location.origin,
+                )
+
+            const basePath =
+                davBase.pathname
+                    .replace(/\/+$/, '')
+
+            const hrefPath =
+                decodeURIComponent(
+                    url.pathname,
+                )
+
+            if (
+                hrefPath === basePath
+            ) {
+                return normalizePath(
+                    wikiRoot.value,
+                )
+            }
+
+            if (
+                hrefPath.startsWith(
+                    basePath + '/',
+                )
+            ) {
+                return normalizePath(
+                    wikiRoot.value +
+                        '/' +
+                        hrefPath
+                            .slice(
+                                basePath.length + 1,
+                            )
+                            .split('/')
+                            .filter(Boolean)
+                            .join('/'),
+                )
+            }
+        } catch {
+            // Fall back to the requested path.
+        }
+
+        return fallbackPath
+    }
+
+    async function webDavRequestUrl(
+        method,
+        url,
+        options = {},
+    ) {
+        const headers = {
+            ...(options.headers || {}),
+        }
+
+        if (OC.requestToken) {
+            headers.requesttoken =
+                OC.requestToken
+        }
+
+        const response = await fetch(
+            url,
+            {
+                method,
+                headers,
+                body: options.body || undefined,
+            },
+        )
+
+        if (!response.ok) {
+            const error =
+                new Error(
+                    `${method} failed (${response.status}).`,
+                )
+
+            error.status =
+                response.status
+
+            throw error
+        }
+
+        return response
+    }
+
+    async function fetchPropertiesTree(
+        folderPath,
+    ) {
+        const result = {
+            files: 0,
+            folders: 0,
+            totalSize: 0,
+            latestModified: '',
+        }
+
+        async function scanFolder(
+            path,
+        ) {
+            const davUrl =
+                buildWebDavUrl(path)
+
+            if (!davUrl) {
+                throw new Error(
+                    'Unable to build properties URL.',
+                )
+            }
+
+            const response =
+                await webDavRequestUrl(
+                    'PROPFIND',
+                    davUrl,
+                    {
+                        headers: {
+                            Depth: '1',
+                            Accept:
+                                'application/xml',
+                        },
+                    },
+                )
+
+            const xmlText =
+                await response.text()
+
+            const elements =
+                getDavResourceElements(
+                    xmlText,
+                )
+
+            for (const element of elements) {
+                const isCollection =
+                    isDavCollection(
+                        element,
+                    )
+
+                const resourcePath =
+                    getDavResponsePath(
+                        element,
+                        path,
+                    )
+
+                const normalizedResourcePath =
+                    normalizePath(
+                        resourcePath,
+                    )
+
+                if (
+                    normalizedResourcePath ===
+                    normalizePath(path)
+                ) {
+                    continue
+                }
+
+                const sizeText =
+                    getDavChildText(
+                        element,
+                        'getcontentlength',
+                    )
+
+                const modified =
+                    getDavChildText(
+                        element,
+                        'getlastmodified',
+                    )
+
+                if (modified) {
+                    const modifiedTime =
+                        new Date(
+                            modified,
+                        ).getTime()
+
+                    const latestTime =
+                        result.latestModified
+                            ? new Date(
+                                result.latestModified,
+                            ).getTime()
+                            : 0
+
+                    if (
+                        !Number.isNaN(
+                            modifiedTime,
+                        ) &&
+                        modifiedTime >
+                            latestTime
+                    ) {
+                        result.latestModified =
+                            modified
+                    }
+                }
+
+                if (isCollection) {
+                    if (
+                        normalizedResourcePath ===
+                        normalizePath(path)
+                    ) {
+                        throw new Error(
+                            'Unable to determine a folder path.',
+                        )
+                    }
+
+                    result.folders++
+
+                    await scanFolder(
+                        normalizedResourcePath,
+                    )
+
+                    continue
+                }
+
+                result.files++
+
+                const size =
+                    Number(sizeText)
+
+                if (
+                    Number.isFinite(size) &&
+                    size >= 0
+                ) {
+                    result.totalSize +=
+                        size
+                }
+            }
+        }
+
+        await scanFolder(
+            normalizePath(folderPath),
+        )
+
+        return result
+    }
+
+    async function loadFileProperties(
+        path,
+        node,
+    ) {
+        const davUrl =
+            buildWebDavUrl(path)
+
+        if (!davUrl) {
+            throw new Error(
+                'Unable to build properties URL.',
+            )
+        }
+
+        const response =
+            await webDavRequestUrl(
+                'PROPFIND',
+                davUrl,
+                {
+                    headers: {
+                        Depth: '0',
+                        Accept:
+                            'application/xml',
+                    },
+                },
+            )
+
+        const xmlText =
+            await response.text()
+
+        const elements =
+            getDavResourceElements(
+                xmlText,
+            )
+
+        if (!elements.length) {
+            throw new Error(
+                'No properties were returned.',
+            )
+        }
+
+        const element =
+            elements[0]
+
+        const sizeText =
+            getDavChildText(
+                element,
+                'getcontentlength',
+            )
+
+        const contentType =
+            getDavChildText(
+                element,
+                'getcontenttype',
+            )
+
+        const modified =
+            getDavChildText(
+                element,
+                'getlastmodified',
+            )
+
+        const size =
+            Number(sizeText)
+
+        return {
+            name: node.name,
+            type: getFileTypeLabel(
+                node.fileType,
+            ),
+            path,
+            extension:
+                node.extension || '',
+            size:
+                Number.isFinite(size) &&
+                size >= 0
+                    ? size
+                    : null,
+            modified,
+            mimeType: contentType,
+        }
+    }
+
+    async function showContextProperties() {
+        const node =
+            contextMenuNode.value
+
+        if (!node) {
+            return
+        }
+
+        const path =
+            getContextTargetPath()
+
+        propertiesDialogError.value = ''
+        propertiesDialogData.value = null
+        propertiesDialogLoading.value = true
+        propertiesDialogVisible.value = true
+
+        try {
+            if (node.type === 'folder') {
+                const stats =
+                    await fetchPropertiesTree(
+                        path,
+                    )
+
+                propertiesDialogData.value = {
+                    name: node.name,
+                    type: 'Folder',
+                    path,
+                    files: stats.files,
+                    folders:
+                        stats.folders,
+                    items:
+                        stats.files +
+                        stats.folders,
+                    totalSize:
+                        stats.totalSize,
+                    latestModified:
+                        stats.latestModified,
+                }
+            } else {
+                propertiesDialogData.value =
+                    await loadFileProperties(
+                        path,
+                        node,
+                    )
+            }
+        } catch (err) {
+            propertiesDialogError.value =
+                err.message ||
+                'Unable to load properties.'
+        } finally {
+            propertiesDialogLoading.value = false
+        }
+    }
+
+    function closePropertiesDialog() {
+        propertiesDialogVisible.value = false
+        propertiesDialogLoading.value = false
+        propertiesDialogError.value = ''
+        propertiesDialogData.value = null
+    }
+
+    async function uploadFilesToContextFolder(
+        files,
+        folder,
+    ) {
+        folder =
+            normalizePath(folder)
+
+        if (!isInsideWikiRoot(folder)) {
+            throw new Error(
+                'Invalid upload destination.',
+            )
+        }
+
+        if (!files.length) {
+            return
+        }
+
+        for (const file of files) {
+            const relativePath =
+                file.webkitRelativePath ||
+                file.name
+
+            const parts =
+                relativePath
+                    .replaceAll('\\', '/')
+                    .split('/')
+                    .filter(Boolean)
+
+            if (!parts.length) {
+                continue
+            }
+
+            const fileName =
+                validateContextName(
+                    parts.pop(),
+                )
+
+            let targetFolder = folder
+
+            for (const part of parts) {
+                const safePart =
+                    validateContextName(part)
+
+                targetFolder =
+                    normalizePath(
+                        targetFolder +
+                            '/' +
+                            safePart,
+                    )
+
+                try {
+                    await webDavRequest(
+                        'MKCOL',
+                        targetFolder,
+                    )
+                } catch (err) {
+                    if (err.status !== 405) {
+                        throw err
+                    }
+                }
+            }
+
+            const targetPath =
+                normalizePath(
+                    targetFolder +
+                        '/' +
+                        fileName,
+                )
+
+            await webDavRequest(
+                'PUT',
+                targetPath,
+                {
+                    headers: {
+                        'Content-Type':
+                            file.type ||
+                            'application/octet-stream',
+                        'If-None-Match': '*',
+                    },
+                    body: file,
+                },
+            )
+        }
+
+        await refreshAfterContextMutation()
+        currentFolder.value = folder
+    }
+
+    function chooseUpload(
+        mode,
+        targetFolder,
+    ) {
+        const input =
+            document.createElement('input')
+
+        input.type = 'file'
+        input.multiple = true
+
+        if (mode === 'folder') {
+            input.webkitdirectory = true
+            input.directory = true
+        }
+
+        input.addEventListener(
+            'change',
+            async (event) => {
+                const files =
+                    Array.from(
+                        event.target.files ||
+                            [],
+                    )
+
+                try {
+                    await uploadFilesToContextFolder(
+                        files,
+                        targetFolder,
+                    )
+                } catch (err) {
+                    showOperationMessage(
+                        err.message ||
+                            'Upload failed.',
+                        'error',
+                    )
+                }
+            },
+            { once: true },
+        )
+
+        input.click()
+    }
+
+    async function handleContextMenuAction(
+        action,
+    ) {
+        const node =
+            contextMenuNode.value
+
+        if (!node) {
+            closeContextMenu()
+            return
+        }
+
+        try {
+            switch (action) {
+                case 'open':
+                    if (
+                        node.type === 'folder'
+                    ) {
+                        await openFolder(
+                            node.path,
+                        )
+                    } else if (
+                        node.fileType ===
+                        'markdown'
+                    ) {
+                        await openFile(
+                            node.path,
+                        )
+                    } else {
+                        selectResource(node)
+                    }
+                    break
+
+                case 'edit':
+                    if (
+                        node.type === 'file' &&
+                        node.fileType ===
+                            'markdown'
+                    ) {
+                        await openFile(
+                            node.path,
+                        )
+                        await startEditing()
+                        editorMode.value =
+                            'split'
+                    }
+                    break
+
+                case 'new-file':
+                    currentFolder.value =
+                        normalizePath(
+                            node.path,
+                        )
+                    await openCreateDialog(
+                        'file',
+                    )
+                    break
+
+                case 'new-folder':
+                    currentFolder.value =
+                        normalizePath(
+                            node.path,
+                        )
+                    await openCreateDialog(
+                        'folder',
+                    )
+                    break
+
+                case 'upload-file':
+                    chooseUpload(
+                        'file',
+                        node.path,
+                    )
+                    break
+
+                case 'upload-folder':
+                    chooseUpload(
+                        'folder',
+                        node.path,
+                    )
+                    break
+
+                case 'rename':
+                    await renameContextTarget()
+                    break
+
+                case 'copy-path':
+                    await copyToClipboard(
+                        getRelativeWikiPath(
+                            getContextTargetPath(),
+                        ),
+                        'Path copied.',
+                    )
+                    break
+
+                case 'copy-markdown-link':
+                    await copyToClipboard(
+                        getMarkdownLinkForPath(
+                            getContextTargetPath(),
+                        ),
+                        'Markdown link copied.',
+                    )
+                    break
+
+                case 'move':
+                    await moveContextTarget()
+                    break
+
+                case 'duplicate':
+                    await duplicateContextTarget()
+                    break
+
+                case 'download':
+                    downloadContextTarget()
+                    break
+
+                case 'properties':
+                    await showContextProperties()
+                    return
+
+                case 'delete':
+                    await deleteContextTarget()
+                    break
+
+                default:
+                    break
+            }
+        } catch (err) {
+            showOperationMessage(
+                err.message ||
+                    'The operation failed.',
+                'error',
+            )
+        } finally {
+            closeContextMenu()
+        }
+    }
+
+    function closeCreateMenu() {
+        createMenuVisible.value = false
+    }
+
+    /*
      * Create menu.
      */
     function toggleCreateMenu() {
         createError.value = ''
         createMenuVisible.value =
             !createMenuVisible.value
+
+        if (createMenuVisible.value) {
+            closeContextMenu()
+        }
     }
 
     const createDialogTitle = computed(() =>
@@ -1892,6 +4597,8 @@
         if (!confirmDiscardChanges()) {
             return
         }
+
+        closeContextMenu()
 
         createDialogType.value = type
         createDialogName.value = ''
@@ -2120,8 +4827,25 @@
                 await response.json()
 
             if (!response.ok) {
+                const serverMessage =
+                    data.message || ''
+
+                const alreadyExists =
+                    response.status === 409 ||
+                    /file or folder with that name already exists/i.test(
+                        serverMessage,
+                    )
+
+                if (alreadyExists) {
+                    throw new Error(
+                        isFolder
+                            ? 'A folder with that name already exists.'
+                            : 'A file with that name already exists.',
+                    )
+                }
+
                 throw new Error(
-                    data.message ||
+                    serverMessage ||
                         (
                             isFolder
                                 ? 'Failed to create folder.'
@@ -2216,9 +4940,7 @@
                 }
             }
 
-            createDialogVisible.value = false
-            createDialogName.value = ''
-            createDialogError.value = ''
+            closeCreateDialog(true)
         } catch (err) {
             createDialogError.value =
                 err.message ||
@@ -2350,6 +5072,33 @@
 
         searchHistoryVisible.value = false
         createMenuVisible.value = false
+
+        if (
+            contextMenuVisible.value &&
+            contextMenuElement.value &&
+            !contextMenuElement.value.contains(
+                event.target,
+            )
+        ) {
+            closeContextMenu()
+        }
+    }
+
+    function handleGlobalKeydown(event) {
+        if (event.key === 'Escape') {
+            if (contextMenuVisible.value) {
+                event.preventDefault()
+                closeContextMenu()
+            }
+        }
+    }
+
+    function handleViewportChange() {
+        if (!contextMenuVisible.value) {
+            return
+        }
+
+        positionContextMenu()
     }
 
     /*
@@ -2461,6 +5210,13 @@
             searchTimeout = null
         }
 
+        if (operationMessageTimeout !== null) {
+            window.clearTimeout(
+                operationMessageTimeout,
+            )
+            operationMessageTimeout = null
+        }
+
         searchRequestId++
 
         searchQuery.value = ''
@@ -2529,6 +5285,8 @@
             return
         }
 
+        closeContextMenu()
+
         const normalizedPath =
             normalizePath(path)
 
@@ -2586,6 +5344,8 @@
             return
         }
 
+        closeContextMenu()
+
         stopEditing()
 
         selectedFile.value = ''
@@ -2609,6 +5369,8 @@
     }
 
     async function openFile(path) {
+        closeContextMenu()
+
         if (
             normalizePath(path) ===
             normalizePath(selectedFile.value)
@@ -4011,6 +6773,8 @@
             return
         }
 
+        closeContextMenu()
+
         error.value = ''
 
         try {
@@ -4093,10 +6857,8 @@
             copiedResourcePath.value = false
             createError.value = ''
             createMenuVisible.value = false
-            createDialogVisible.value = false
-            createDialogName.value = ''
-            createDialogFolder.value = ''
-            createDialogError.value = ''
+            closeCreateDialog(true)
+            closeContextMenu()
 
             clearSearch()
 
@@ -4487,6 +7249,7 @@
             'toggle-folder',
             'open-file',
             'select-resource',
+            'context-menu',
         ],
 
         setup(props, { emit }) {
@@ -4623,6 +7386,17 @@
                                         props.node,
                                     )
                                 },
+
+                                onContextmenu: (event) => {
+                                    event.preventDefault()
+                                    event.stopPropagation()
+
+                                    emit(
+                                        'context-menu',
+                                        event,
+                                        props.node,
+                                    )
+                                },
                             },
                             [
                                 h(
@@ -4717,6 +7491,17 @@
                                                             'select-resource',
                                                             resourceNode,
                                                         ),
+
+                                                onContextMenu:
+                                                    (
+                                                        event,
+                                                        resourceNode,
+                                                    ) =>
+                                                        emit(
+                                                            'context-menu',
+                                                            event,
+                                                            resourceNode,
+                                                        ),
                                             },
                                         ),
                                 ),
@@ -4771,11 +7556,11 @@
             )
 
             /*
-            * A folder can have children that have not
-            * been loaded yet. Therefore, show the
-            * chevron until we know that the folder is
-            * actually empty.
-            */
+             * A folder can have children that have not
+             * been loaded yet. Therefore, show the
+             * chevron until we know that the folder is
+             * actually empty.
+             */
             const hasExpandableChildren = computed(() =>
                 !props.node.loaded ||
                 folderChildren.value.length > 0,
@@ -4951,6 +7736,22 @@
             handleDocumentClick,
         )
 
+        document.addEventListener(
+            'keydown',
+            handleGlobalKeydown,
+        )
+
+        window.addEventListener(
+            'resize',
+            handleViewportChange,
+        )
+
+        window.addEventListener(
+            'scroll',
+            handleViewportChange,
+            true,
+        )
+
         loadWikiRoot()
 
         window.addEventListener(
@@ -4963,6 +7764,22 @@
         document.removeEventListener(
             'click',
             handleDocumentClick,
+        )
+
+        document.removeEventListener(
+            'keydown',
+            handleGlobalKeydown,
+        )
+
+        window.removeEventListener(
+            'resize',
+            handleViewportChange,
+        )
+
+        window.removeEventListener(
+            'scroll',
+            handleViewportChange,
+            true,
         )
 
         window.removeEventListener(
