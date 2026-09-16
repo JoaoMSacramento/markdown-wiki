@@ -387,6 +387,40 @@
                 <ul
                     v-else
                     class="tree-list"
+                    :class="{
+                        'tree-list-drop-target-valid':
+                            normalizePath(treeDropTargetPath) ===
+                                normalizePath(wikiRoot) &&
+                            treeDropTargetValid,
+                        'tree-list-drop-target-invalid':
+                            normalizePath(treeDropTargetPath) ===
+                                normalizePath(wikiRoot) &&
+                            !treeDropTargetValid,
+                    }"
+                    :style="
+                        normalizePath(treeDropTargetPath) ===
+                        normalizePath(wikiRoot)
+                            ? {
+                                borderRadius:
+                                    'var(--border-radius-element)',
+                                outline: treeDropTargetValid
+                                    ? '2px solid var(--color-primary-element)'
+                                    : '2px solid var(--color-error)',
+                                outlineOffset: '-2px',
+                                background: treeDropTargetValid
+                                    ? 'var(--color-primary-element-light)'
+                                    : 'transparent',
+                            }
+                            : null
+                    "
+                    @dragover="handleTreeDragOver(
+                        $event,
+                        getWikiRootDropTarget(),
+                    )"
+                    @drop="handleTreeDrop(
+                        $event,
+                        getWikiRootDropTarget(),
+                    )"
                 >
                     <TreeNode
                         v-for="node in tree"
@@ -491,6 +525,26 @@
                         </div>
 
                         <div class="document-actions">
+                            <button
+                                v-if="tableOfContents.length > 0"
+                                type="button"
+                                class="document-action-button document-toc-toggle"
+                                :class="{
+                                    'document-toc-toggle-active':
+                                        tableOfContentsVisible,
+                                }"
+                                :aria-pressed="tableOfContentsVisible"
+                                @click="
+                                    tableOfContentsVisible =
+                                        !tableOfContentsVisible
+                                "
+                            >
+                                {{
+                                    tableOfContentsVisible
+                                        ? 'Hide contents'
+                                        : 'Show contents'
+                                }}
+                            </button>
                             <template v-if="!editing">
                                 <button
                                     type="button"
@@ -617,7 +671,11 @@
                     </div>
                 </div>
 
-                <div class="wiki-document-scroll">
+                <div
+                    ref="documentScrollElement"
+                    class="wiki-document-scroll"
+                    @scroll="updateActiveHeading"
+                >
                     <div class="wiki-document-inner">
                         <div class="document-header">
                             <h2>
@@ -639,20 +697,29 @@
                             {{ fileError }}
                         </div>
 
-                        <template v-else-if="editing">
-                            <div
-                                v-if="
-                                    editorMode !==
-                                    'preview'
-                                "
-                                class="markdown-editor-toolbar"
+                        <div
+                            v-else
+                            class="document-body-layout"
+                            :class="{
+                                'document-body-layout-with-toc':
+                                    showTableOfContents,
+                            }"
+                        >
+                            <div class="document-body-main">
+                                <template v-if="editing">
+                                    <div
+                                        v-if="
+                                            editorMode !==
+                                            'preview'
+                                        "
+                                        class="markdown-editor-toolbar"
                                 role="toolbar"
                                 aria-label="Markdown formatting"
                             >
-                                <div class="markdown-toolbar-group">
+                                <div class="markdown-editor-toolbar-group">
                                     <button
                                         type="button"
-                                        class="markdown-toolbar-button markdown-toolbar-button-emphasis"
+                                        class="markdown-editor-toolbar-button markdown-toolbar-button-emphasis"
                                         title="Bold"
                                         aria-label="Bold"
                                         @mousedown.prevent
@@ -668,7 +735,7 @@
 
                                     <button
                                         type="button"
-                                        class="markdown-toolbar-button markdown-toolbar-button-emphasis"
+                                        class="markdown-editor-toolbar-button markdown-toolbar-button-emphasis"
                                         title="Italic"
                                         aria-label="Italic"
                                         @mousedown.prevent
@@ -684,7 +751,7 @@
 
                                     <button
                                         type="button"
-                                        class="markdown-toolbar-button markdown-toolbar-button-emphasis"
+                                        class="markdown-editor-toolbar-button markdown-toolbar-button-emphasis"
                                         title="Strikethrough"
                                         aria-label="Strikethrough"
                                         @mousedown.prevent
@@ -699,12 +766,12 @@
                                     </button>
                                 </div>
 
-                                <div class="markdown-toolbar-separator" />
+                                <div class="markdown-editor-toolbar-separator" />
 
-                                <div class="markdown-toolbar-group">
+                                <div class="markdown-editor-toolbar-group">
                                     <button
                                         type="button"
-                                        class="markdown-toolbar-button markdown-toolbar-heading"
+                                        class="markdown-editor-toolbar-button markdown-toolbar-heading"
                                         title="Heading 1"
                                         aria-label="Heading 1"
                                         @mousedown.prevent
@@ -719,7 +786,7 @@
 
                                     <button
                                         type="button"
-                                        class="markdown-toolbar-button markdown-toolbar-heading"
+                                        class="markdown-editor-toolbar-button markdown-toolbar-heading"
                                         title="Heading 2"
                                         aria-label="Heading 2"
                                         @mousedown.prevent
@@ -734,7 +801,7 @@
 
                                     <button
                                         type="button"
-                                        class="markdown-toolbar-button markdown-toolbar-heading"
+                                        class="markdown-editor-toolbar-button markdown-toolbar-heading"
                                         title="Heading 3"
                                         aria-label="Heading 3"
                                         @mousedown.prevent
@@ -748,12 +815,12 @@
                                     </button>
                                 </div>
 
-                                <div class="markdown-toolbar-separator" />
+                                <div class="markdown-editor-toolbar-separator" />
 
-                                <div class="markdown-toolbar-group">
+                                <div class="markdown-editor-toolbar-group">
                                     <button
                                         type="button"
-                                        class="markdown-toolbar-button"
+                                        class="markdown-editor-toolbar-button"
                                         title="Bullet list"
                                         aria-label="Bullet list"
                                         @mousedown.prevent
@@ -766,7 +833,7 @@
 
                                     <button
                                         type="button"
-                                        class="markdown-toolbar-button"
+                                        class="markdown-editor-toolbar-button"
                                         title="Ordered list"
                                         aria-label="Ordered list"
                                         @mousedown.prevent
@@ -779,7 +846,7 @@
 
                                     <button
                                         type="button"
-                                        class="markdown-toolbar-button"
+                                        class="markdown-editor-toolbar-button"
                                         title="Checklist"
                                         aria-label="Checklist"
                                         @mousedown.prevent
@@ -792,7 +859,7 @@
 
                                     <button
                                         type="button"
-                                        class="markdown-toolbar-button"
+                                        class="markdown-editor-toolbar-button"
                                         title="Blockquote"
                                         aria-label="Blockquote"
                                         @mousedown.prevent
@@ -804,12 +871,12 @@
                                     </button>
                                 </div>
 
-                                <div class="markdown-toolbar-separator" />
+                                <div class="markdown-editor-toolbar-separator" />
 
-                                <div class="markdown-toolbar-group">
+                                <div class="markdown-editor-toolbar-group">
                                     <button
                                         type="button"
-                                        class="markdown-toolbar-button"
+                                        class="markdown-editor-toolbar-button"
                                         title="Insert link"
                                         aria-label="Insert link"
                                         @mousedown.prevent
@@ -822,7 +889,7 @@
 
                                     <button
                                         type="button"
-                                        class="markdown-toolbar-button"
+                                        class="markdown-editor-toolbar-button"
                                         title="Insert image"
                                         aria-label="Insert image"
                                         @mousedown.prevent
@@ -834,12 +901,12 @@
                                     </button>
                                 </div>
 
-                                <div class="markdown-toolbar-separator" />
+                                <div class="markdown-editor-toolbar-separator" />
 
-                                <div class="markdown-toolbar-group">
+                                <div class="markdown-editor-toolbar-group">
                                     <button
                                         type="button"
-                                        class="markdown-toolbar-button markdown-toolbar-code"
+                                        class="markdown-editor-toolbar-button markdown-toolbar-code"
                                         title="Inline code"
                                         aria-label="Inline code"
                                         @mousedown.prevent
@@ -855,7 +922,7 @@
 
                                     <select
                                         v-model="selectedCodeLanguage"
-                                        class="markdown-toolbar-code-language"
+                                        class="markdown-editor-toolbar-select"
                                         title="Code block language"
                                         aria-label="Code block language"
                                         @mousedown.stop
@@ -871,7 +938,7 @@
 
                                     <button
                                         type="button"
-                                        class="markdown-toolbar-button markdown-toolbar-code"
+                                        class="markdown-editor-toolbar-button markdown-toolbar-code"
                                         title="Code block"
                                         aria-label="Code block"
                                         @mousedown.prevent
@@ -882,9 +949,49 @@
                                         Code
                                     </button>
 
+                                    <div
+                                        class="markdown-toolbar-diagram-wrapper"
+                                        @click.stop
+                                    >
+                                        <button
+                                            type="button"
+                                            class="markdown-editor-toolbar-button"
+                                            title="Insert Mermaid diagram"
+                                            aria-label="Insert Mermaid diagram"
+                                            :aria-expanded="diagramMenuVisible"
+                                            @mousedown.prevent
+                                            @click="
+                                                diagramMenuVisible =
+                                                    !diagramMenuVisible
+                                            "
+                                        >
+                                            Diagram ▾
+                                        </button>
+                                    
+                                        <div
+                                            v-if="diagramMenuVisible"
+                                            class="markdown-toolbar-diagram-menu"
+                                        >
+                                            <button
+                                                v-for="diagram in diagramTemplates"
+                                                :key="diagram.type"
+                                                type="button"
+                                                class="markdown-toolbar-diagram-item"
+                                                @mousedown.prevent
+                                                @click="
+                                                    insertMermaidDiagram(
+                                                        diagram.type,
+                                                    )
+                                                "
+                                            >
+                                                {{ diagram.label }}
+                                            </button>
+                                        </div>
+                                    </div>
+
                                     <button
                                         type="button"
-                                        class="markdown-toolbar-button"
+                                        class="markdown-editor-toolbar-button"
                                         title="Horizontal rule"
                                         aria-label="Horizontal rule"
                                         @mousedown.prevent
@@ -966,25 +1073,133 @@
                                 </div>
                             </div>
 
-                            <div
-                                v-else
-                                class="editor-preview-only"
-                            >
-                                <article
-                                    class="markdown-content"
-                                    v-html="
-                                        renderedEditorMarkdown
-                                    "
-                                />
-                            </div>
-                        </template>
+                                    <div
+                                        v-else
+                                        class="editor-preview-only"
+                                    >
+                                        <article
+                                            class="markdown-content"
+                                            @click="handleMarkdownClick"
+                                            v-html="
+                                                renderedEditorMarkdown
+                                            "
+                                        />
+                                    </div>
+                                </template>
 
-                        <article
-                            v-else
-                            class="markdown-content"
-                            @click="handleMarkdownClick"
-                            v-html="renderedMarkdown"
-                        />
+                                <article
+                                    v-else
+                                    class="markdown-content"
+                                    @click="handleMarkdownClick"
+                                    v-html="renderedMarkdown"
+                                />
+
+                                <nav
+                                    v-if="
+                                        !editing &&
+                                        (
+                                            previousMarkdownPath ||
+                                            nextMarkdownPath
+                                        )
+                                    "
+                                    class="document-page-navigation"
+                                    aria-label="Page navigation"
+                                >
+                                    <button
+                                        v-if="previousMarkdownPath"
+                                        type="button"
+                                        class="document-page-navigation-button document-page-navigation-previous"
+                                        :title="
+                                            `Previous: ${previousMarkdownDisplayName}`
+                                        "
+                                        @click="
+                                            navigateToAdjacentFile(
+                                                previousMarkdownPath,
+                                            )
+                                        "
+                                    >
+                                        <span
+                                            class="document-page-navigation-direction"
+                                        >
+                                            ← Previous
+                                        </span>
+                                        <span
+                                            class="document-page-navigation-name"
+                                        >
+                                            {{ previousMarkdownDisplayName }}
+                                        </span>
+                                    </button>
+
+                                    <span
+                                        v-else
+                                        class="document-page-navigation-spacer"
+                                        aria-hidden="true"
+                                    />
+
+                                    <button
+                                        v-if="nextMarkdownPath"
+                                        type="button"
+                                        class="document-page-navigation-button document-page-navigation-next"
+                                        :title="
+                                            `Next: ${nextMarkdownDisplayName}`
+                                        "
+                                        @click="
+                                            navigateToAdjacentFile(
+                                                nextMarkdownPath,
+                                            )
+                                        "
+                                    >
+                                        <span
+                                            class="document-page-navigation-direction"
+                                        >
+                                            Next →
+                                        </span>
+                                        <span
+                                            class="document-page-navigation-name"
+                                        >
+                                            {{ nextMarkdownDisplayName }}
+                                        </span>
+                                    </button>
+                                </nav>
+                            </div>
+
+                            <aside
+                                v-if="showTableOfContents"
+                                class="wiki-toc"
+                                aria-label="Table of contents"
+                            >
+                                <div class="wiki-toc-inner">
+                                    <div class="wiki-toc-title">
+                                        On this page
+                                    </div>
+
+                                    <nav class="wiki-toc-nav">
+                                        <button
+                                            v-for="heading in tableOfContents"
+                                            :key="heading.id"
+                                            type="button"
+                                            class="wiki-toc-link"
+                                            :class="[
+                                                `wiki-toc-level-${heading.level}`,
+                                                {
+                                                    'wiki-toc-link-active':
+                                                        activeHeadingId ===
+                                                        heading.id,
+                                                },
+                                            ]"
+                                            :title="heading.text"
+                                            @click="
+                                                scrollToHeading(
+                                                    heading.id,
+                                                )
+                                            "
+                                        >
+                                            {{ heading.text }}
+                                        </button>
+                                    </nav>
+                                </div>
+                            </aside>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1055,29 +1270,147 @@
 
             <div
                 v-else
-                class="wiki-empty-state"
+                class="wiki-folder-view"
             >
-                <div class="wiki-empty-state-content">
-                    <h2>
-                        {{ currentFolderName }}
-                    </h2>
+                <div class="folder-view-toolbar">
+                    <div class="document-breadcrumbs">
+                        <button
+                            type="button"
+                            class="breadcrumb-button"
+                            @click="openFolder(wikiRoot)"
+                        >
+                            {{ wikiRootName }}
+                        </button>
 
-                    <p>
-                        {{
-                            treeMode === 'markdown'
-                                ? 'Select a Markdown file from the sidebar to open it.'
-                                : 'Select a Markdown file from the sidebar to open it, or another file to view its path.'
-                        }}
-                    </p>
+                        <template
+                            v-for="breadcrumb in folderBreadcrumbs"
+                            :key="breadcrumb.path"
+                        >
+                            <span class="breadcrumb-separator">
+                                /
+                            </span>
 
-                    <button
-                        v-if="currentFolder && parentFolder"
-                        type="button"
-                        class="wiki-folder-button"
-                        @click="openFolder(parentFolder)"
-                    >
-                        Go to parent folder
-                    </button>
+                            <button
+                                type="button"
+                                class="breadcrumb-button"
+                                @click="openFolder(breadcrumb.path)"
+                            >
+                                {{ breadcrumb.name }}
+                            </button>
+                        </template>
+                    </div>
+                </div>
+
+                <div class="folder-view-scroll">
+                    <div class="folder-view-content">
+                        <div class="folder-view-heading">
+                            <div>
+                                <h2>{{ currentFolderName }}</h2>
+                                <p>
+                                    {{ currentFolderItems.length }}
+                                    {{
+                                        currentFolderItems.length === 1
+                                            ? 'item'
+                                            : 'items'
+                                    }}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div
+                            v-if="currentFolderLoading"
+                            class="folder-view-empty"
+                        >
+                            Loading folder…
+                        </div>
+
+                        <div
+                            v-else-if="currentFolderItems.length === 0"
+                            class="folder-view-empty"
+                        >
+                            {{
+                                treeMode === 'markdown'
+                                    ? 'No Markdown files or folders in this folder.'
+                                    : 'This folder is empty.'
+                            }}
+                        </div>
+
+                        <div
+                            v-else
+                            class="folder-view-list"
+                        >
+                            <button
+                                v-for="item in currentFolderItems"
+                                :key="item.path"
+                                type="button"
+                                class="folder-view-item"
+                                @click="openFolderViewItem(item)"
+                                @contextmenu="
+                                    openContextMenu(
+                                        $event,
+                                        item,
+                                    )
+                                "
+                            >
+                                <span
+                                    class="folder-view-item-icon"
+                                    aria-hidden="true"
+                                >
+                                    <svg
+                                        v-if="item.type === 'folder'"
+                                        class="folder-view-folder-icon"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        stroke-width="2"
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                    >
+                                        <path
+                                            d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"
+                                        />
+                                    </svg>
+
+                                    <ResourceIcon
+                                        v-else
+                                        :file-type="item.fileType"
+                                    />
+                                </span>
+
+                                <span class="folder-view-item-main">
+                                    <span class="folder-view-item-name">
+                                        {{ item.name }}
+                                    </span>
+
+                                    <span class="folder-view-item-type">
+                                        {{
+                                            item.type === 'folder'
+                                                ? 'Folder'
+                                                : item.fileType === 'markdown'
+                                                    ? 'Markdown'
+                                                    : 'File'
+                                        }}
+                                    </span>
+                                </span>
+
+                                <span
+                                    class="folder-view-item-arrow"
+                                    aria-hidden="true"
+                                >
+                                    <svg
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        stroke-width="2"
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                    >
+                                        <path d="m9 18 6-6-6-6" />
+                                    </svg>
+                                </span>
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </main>
@@ -2187,6 +2520,7 @@
     import { marked } from 'marked'
     import DOMPurify from 'dompurify'
     import hljs from 'highlight.js/lib/common'
+    import mermaid from 'mermaid'
 
     import {
         getFilePickerBuilder,
@@ -2199,6 +2533,9 @@
 
     const selectedFile = ref('')
     const selectedResource = ref(null)
+
+    const previousMarkdownPath = ref('')
+    const nextMarkdownPath = ref('')
 
     const markdown = ref('')
     const editedMarkdown = ref('')
@@ -2296,6 +2633,33 @@
     const editing = ref(false)
     const editorMode = ref('split')
     const editorTextarea = ref(null)
+    const diagramMenuVisible = ref(false)
+
+    const diagramTemplates = [
+        {
+            type: 'flowchart',
+            label: 'Flowchart',
+        },
+        {
+            type: 'sequence',
+            label: 'Sequence diagram',
+        },
+        {
+            type: 'class',
+            label: 'Class diagram',
+        },
+        {
+            type: 'state',
+            label: 'State diagram',
+        },
+    ]
+
+    /*
+     * Table of contents state.
+     */
+    const documentScrollElement = ref(null)
+    const activeHeadingId = ref('')
+    const tableOfContentsVisible = ref(true)
 
     /*
      * Search state.
@@ -2938,6 +3302,8 @@
     function clearContextSelection() {
         selectedFile.value = ''
         selectedResource.value = null
+        previousMarkdownPath.value = ''
+        nextMarkdownPath.value = ''
         markdown.value = ''
         editedMarkdown.value = ''
         fileError.value = ''
@@ -3907,6 +4273,54 @@
         treeDropTargetValid.value = false
     }
 
+    function getWikiRootDropTarget() {
+        const rootPath =
+            normalizePath(wikiRoot.value)
+
+        if (!rootPath) {
+            return null
+        }
+
+        return {
+            type: 'folder',
+            path: rootPath,
+            name:
+                getNameFromPath(rootPath) ||
+                'Wiki Root',
+            isWikiRootDropTarget: true,
+        }
+    }
+
+    function getTreeDropDestinationTarget(target) {
+        if (!target) {
+            return null
+        }
+
+        if (target.type === 'folder') {
+            return target
+        }
+
+        const parentPath =
+            getParentPath(
+                normalizePath(target.path),
+            )
+
+        if (!parentPath) {
+            return null
+        }
+
+        return {
+            type: 'folder',
+            path: parentPath,
+            name:
+                normalizePath(parentPath) ===
+                normalizePath(wikiRoot.value)
+                    ? 'Wiki Root'
+                    : getNameFromPath(parentPath),
+            isLevelDropTarget: true,
+        }
+    }
+
     function canDropTreeNode(source, target) {
         if (!source || !target || target.type !== 'folder') {
             return false
@@ -4010,31 +4424,64 @@
     }
 
     function handleTreeDragOver(event, target) {
-        const source = treeDragSource.value
+        const source =
+            treeDragSource.value
 
-        if (!source || !target || target.type !== 'folder') {
+        const destinationTarget =
+            getTreeDropDestinationTarget(
+                target,
+            )
+
+        if (
+            !source ||
+            !destinationTarget
+        ) {
             return
         }
 
         event.preventDefault()
         event.stopPropagation()
 
-        const targetPath = normalizePath(target.path)
-        const valid = canDropTreeNode(source, target)
+        const targetPath =
+            normalizePath(
+                destinationTarget.path,
+            )
 
-        if (treeDropTargetPath.value !== targetPath) {
+        const valid =
+            canDropTreeNode(
+                source,
+                destinationTarget,
+            )
+
+        if (
+            treeDropTargetPath.value !==
+            targetPath
+        ) {
             clearTreeDragExpandTimeout()
         }
 
-        treeDropTargetPath.value = targetPath
-        treeDropTargetValid.value = valid
+        treeDropTargetPath.value =
+            targetPath
+
+        treeDropTargetValid.value =
+            valid
 
         if (event.dataTransfer) {
-            event.dataTransfer.dropEffect = valid ? 'move' : 'none'
+            event.dataTransfer.dropEffect =
+                valid
+                    ? 'move'
+                    : 'none'
         }
 
-        if (valid) {
-            scheduleTreeDragExpand(target)
+        if (
+            valid &&
+            target?.type === 'folder' &&
+            !destinationTarget
+                .isWikiRootDropTarget
+        ) {
+            scheduleTreeDragExpand(
+                destinationTarget,
+            )
         } else {
             clearTreeDragExpandTimeout()
         }
@@ -4055,27 +4502,43 @@
     }
 
     async function handleTreeDrop(event, target) {
-        const source = treeDragSource.value
+        const source =
+            treeDragSource.value
 
         event.preventDefault()
         event.stopPropagation()
         clearTreeDragExpandTimeout()
 
-        if (!source || !target || target.type !== 'folder') {
+        const destinationTarget =
+            getTreeDropDestinationTarget(
+                target,
+            )
+
+        if (
+            !source ||
+            !destinationTarget
+        ) {
             resetTreeDragState()
             return
         }
 
-        const sourcePath = normalizePath(source.path)
-        const destinationFolder = normalizePath(target.path)
-        const sourceParent = getParentPath(sourcePath)
+        const sourcePath =
+            normalizePath(source.path)
+
+        const destinationFolder =
+            normalizePath(
+                destinationTarget.path,
+            )
+
+        const sourceParent =
+            getParentPath(sourcePath)
 
         if (destinationFolder === sourceParent) {
             resetTreeDragState()
             return
         }
 
-        if (!canDropTreeNode(source, target)) {
+        if (!canDropTreeNode(source, destinationTarget)) {
             const invalidDescendant =
                 source.type === 'folder' &&
                 (
@@ -5287,7 +5750,9 @@
                         await openFile(
                             node.path,
                         )
-                        await startEditing()
+                        await startEditing({
+                            preserveScroll: false,
+                        })
                         editorMode.value =
                             'split'
                     }
@@ -5974,6 +6439,7 @@
 
         searchHistoryVisible.value = false
         createMenuVisible.value = false
+        diagramMenuVisible.value = false
 
         if (
             contextMenuVisible.value &&
@@ -5988,6 +6454,11 @@
 
     function handleGlobalKeydown(event) {
         if (event.key === 'Escape') {
+            if (diagramMenuVisible.value) {
+                event.preventDefault()
+                diagramMenuVisible.value = false
+            }
+
             if (contextMenuVisible.value) {
                 event.preventDefault()
                 closeContextMenu()
@@ -6251,41 +6722,97 @@
         copiedResourcePath.value = false
 
         currentFolder.value = normalizedPath
+        currentFolderLoading.value = true
 
-        if (
-            normalizedPath ===
-            normalizePath(wikiRoot.value)
-        ) {
-            const next = new Set(
-                expandedFolders.value,
+        try {
+            if (
+                normalizedPath ===
+                normalizePath(wikiRoot.value)
+            ) {
+                const next = new Set(
+                    expandedFolders.value,
+                )
+
+                next.add(normalizedPath)
+
+                expandedFolders.value = next
+
+                /*
+                 * The root tree is already the root folder listing.
+                 * Refresh only when it has not been loaded yet.
+                 */
+                if (tree.value.length === 0) {
+                    await loadRootTree(false)
+                }
+
+                return
+            }
+
+            let node = findNode(
+                tree.value,
+                normalizedPath,
             )
 
-            next.add(normalizedPath)
+            /*
+             * Breadcrumb navigation can target a folder whose node is
+             * not currently loaded in the tree. Expand/load the path
+             * first so the central Folder View always has real items.
+             */
+            if (
+                !node ||
+                node.type !== 'folder'
+            ) {
+                await ensureTreePathLoaded(
+                    normalizedPath,
+                )
 
-            expandedFolders.value = next
+                node = findNode(
+                    tree.value,
+                    normalizedPath,
+                )
+            }
 
+            if (
+                node &&
+                node.type === 'folder'
+            ) {
+                await loadFolderChildren(node)
+
+                const next = new Set(
+                    expandedFolders.value,
+                )
+
+                next.add(normalizedPath)
+
+                expandedFolders.value = next
+            }
+        } catch (err) {
+            showOperationMessage(
+                err.message ||
+                    'Failed to load folder contents.',
+                'error',
+            )
+        } finally {
+            currentFolderLoading.value = false
+        }
+    }
+
+    async function openFolderViewItem(item) {
+        if (!item) {
             return
         }
 
-        const node = findNode(
-            tree.value,
-            normalizedPath,
-        )
-
-        if (
-            node &&
-            node.type === 'folder'
-        ) {
-            await loadFolderChildren(node)
-
-            const next = new Set(
-                expandedFolders.value,
-            )
-
-            next.add(normalizedPath)
-
-            expandedFolders.value = next
+        if (item.type === 'folder') {
+            await openFolder(item.path)
+            return
         }
+
+        if (item.fileType === 'markdown') {
+            await openFile(item.path)
+            return
+        }
+
+        await selectResource(item)
     }
 
     async function selectResource(node) {
@@ -6298,6 +6825,8 @@
         stopEditing()
 
         selectedFile.value = ''
+        previousMarkdownPath.value = ''
+        nextMarkdownPath.value = ''
         markdown.value = ''
         editedMarkdown.value = ''
         fileError.value = ''
@@ -6319,6 +6848,117 @@
         await scrollTreePathIntoView(
             node.path,
         )
+    }
+
+    function collectMarkdownFilesFromLoadedTree(nodes = tree.value) {
+        const paths = []
+
+        const visit = (items) => {
+            for (const item of items || []) {
+                if (item.type === 'folder') {
+                    visit(item.children)
+                    continue
+                }
+
+                if (
+                    item.type === 'file' &&
+                    (
+                        item.fileType === 'markdown' ||
+                        item.path
+                            .toLowerCase()
+                            .endsWith('.md')
+                    )
+                ) {
+                    paths.push(
+                        normalizePath(item.path),
+                    )
+                }
+            }
+        }
+
+        visit(nodes)
+
+        return paths
+    }
+
+    function updateMarkdownNavigation(
+        currentPath = selectedFile.value,
+    ) {
+        previousMarkdownPath.value = ''
+        nextMarkdownPath.value = ''
+
+        const root =
+            normalizePath(wikiRoot.value)
+
+        const normalizedCurrentPath =
+            normalizePath(currentPath)
+
+        if (
+            !root ||
+            !normalizedCurrentPath
+        ) {
+            return
+        }
+
+        try {
+            const files =
+                collectMarkdownFilesFromLoadedTree()
+
+            const currentIndex =
+                files.findIndex(
+                    (path) =>
+                        normalizePath(path) ===
+                        normalizedCurrentPath,
+                )
+
+            if (currentIndex === -1) {
+                return
+            }
+
+            previousMarkdownPath.value =
+                currentIndex > 0
+                    ? files[currentIndex - 1]
+                    : ''
+
+            nextMarkdownPath.value =
+                currentIndex <
+                files.length - 1
+                    ? files[currentIndex + 1]
+                    : ''
+        } catch (err) {
+            console.warn(
+                'Failed to build Markdown navigation.',
+                err,
+            )
+        }
+    }
+
+    async function navigateToAdjacentFile(path) {
+        const targetPath =
+            normalizePath(path)
+
+        if (!targetPath) {
+            return
+        }
+
+        const previousSelection =
+            normalizePath(selectedFile.value)
+
+        await openFile(targetPath)
+
+        if (
+            normalizePath(selectedFile.value) !==
+            previousSelection &&
+            normalizePath(selectedFile.value) ===
+            targetPath
+        ) {
+            await nextTick()
+
+            if (documentScrollElement.value) {
+                documentScrollElement.value.scrollTop = 0
+                documentScrollElement.value.scrollLeft = 0
+            }
+        }
     }
 
     async function openFile(path) {
@@ -6479,6 +7119,10 @@
             await scrollTreePathIntoView(
                 filePath,
             )
+
+            updateMarkdownNavigation(
+                filePath,
+            )
         } catch (err) {
             fileError.value =
                 err.message
@@ -6487,10 +7131,25 @@
         }
     }
 
-    async function startEditing() {
+    async function startEditing({
+        preserveScroll = true,
+    } = {}) {
         if (!selectedFile.value || loadingFile.value) {
             return
         }
+
+        const documentScroll =
+            documentScrollElement.value
+
+        const previousScrollTop =
+            documentScroll
+                ? documentScroll.scrollTop
+                : 0
+
+        const previousScrollLeft =
+            documentScroll
+                ? documentScroll.scrollLeft
+                : 0
 
         saveError.value = ''
 
@@ -6504,8 +7163,26 @@
 
         await nextTick()
 
+        await new Promise((resolve) => {
+            window.requestAnimationFrame(resolve)
+        })
+
+        if (documentScrollElement.value) {
+            if (preserveScroll) {
+                documentScrollElement.value.scrollTop =
+                    previousScrollTop
+                documentScrollElement.value.scrollLeft =
+                    previousScrollLeft
+            } else {
+                documentScrollElement.value.scrollTop = 0
+                documentScrollElement.value.scrollLeft = 0
+            }
+        }
+
         if (editorTextarea.value) {
-            editorTextarea.value.focus()
+            editorTextarea.value.focus({
+                preventScroll: true,
+            })
         }
     }
 
@@ -6916,6 +7593,115 @@
             range.lineStart,
             range.lineStart +
                 replacement.length,
+        )
+    }
+
+    function insertMermaidDiagram(type) {
+        const textarea = getEditorElement()
+
+        if (!textarea) {
+            diagramMenuVisible.value = false
+            return
+        }
+
+        const start = textarea.selectionStart
+        const end = textarea.selectionEnd
+        const value = editedMarkdown.value
+
+        const templates = {
+            flowchart: {
+                content:
+                    '```mermaid\n' +
+                    'flowchart TD\n' +
+                    '    A[Start] --> B[Next step]\n' +
+                    '```\n',
+                selection: 'A[Start] --> B[Next step]',
+            },
+            sequence: {
+                content:
+                    '```mermaid\n' +
+                    'sequenceDiagram\n' +
+                    '    participant A as User\n' +
+                    '    participant B as Service\n' +
+                    '    A->>B: Request\n' +
+                    '    B-->>A: Response\n' +
+                    '```\n',
+                selection: 'A->>B: Request',
+            },
+            class: {
+                content:
+                    '```mermaid\n' +
+                    'classDiagram\n' +
+                    '    class Example {\n' +
+                    '        +String name\n' +
+                    '        +run()\n' +
+                    '    }\n' +
+                    '```\n',
+                selection: 'Example',
+            },
+            state: {
+                content:
+                    '```mermaid\n' +
+                    'stateDiagram-v2\n' +
+                    '    [*] --> Ready\n' +
+                    '    Ready --> Running\n' +
+                    '    Running --> [*]\n' +
+                    '```\n',
+                selection: 'Ready --> Running',
+            },
+        }
+
+        const template =
+            templates[type]
+
+        if (!template) {
+            diagramMenuVisible.value = false
+            return
+        }
+
+        const needsLeadingNewline =
+            start > 0 &&
+            value[start - 1] !== '\n'
+
+        const needsTrailingNewline =
+            end < value.length &&
+            value[end] !== '\n'
+
+        const prefix =
+            needsLeadingNewline
+                ? '\n\n'
+                : ''
+
+        const suffix =
+            needsTrailingNewline
+                ? '\n'
+                : ''
+
+        const replacement =
+            prefix +
+            template.content +
+            suffix
+
+        const selectionOffset =
+            replacement.indexOf(
+                template.selection,
+            )
+
+        const selectionStart =
+            start + selectionOffset
+
+        const selectionEnd =
+            selectionStart +
+            template.selection.length
+
+        diagramMenuVisible.value = false
+
+        replaceEditorText(
+            start,
+            end,
+            replacement,
+            selectionStart,
+            selectionEnd,
         )
     }
 
@@ -7597,7 +8383,7 @@
         return document.body.innerHTML
     }
 
-    function handleMarkdownClick(event) {
+    async function handleMarkdownClick(event) {
         const link =
             event.target.closest('a')
 
@@ -7615,14 +8401,59 @@
         if (
             href.startsWith('http://') ||
             href.startsWith('https://') ||
-            href.startsWith('#') ||
-            href.startsWith('mailto:')
+            href.startsWith('mailto:') ||
+            href.startsWith('tel:') ||
+            href.startsWith('//')
         ) {
             return
         }
 
+        const hashIndex =
+            href.indexOf('#')
+
+        const rawPath =
+            hashIndex >= 0
+                ? href.slice(0, hashIndex)
+                : href
+
+        const rawHash =
+            hashIndex >= 0
+                ? href.slice(hashIndex + 1)
+                : ''
+
+        let linkPath = rawPath
+        let headingId = rawHash
+
+        try {
+            linkPath = decodeURIComponent(rawPath)
+        } catch {
+            linkPath = rawPath
+        }
+
+        try {
+            headingId = decodeURIComponent(rawHash)
+        } catch {
+            headingId = rawHash
+        }
+
+        if (!linkPath) {
+            if (!headingId) {
+                return
+            }
+
+            event.preventDefault()
+
+            await scrollToHeading(
+                headingId,
+            )
+
+            return
+        }
+
         if (
-            !href.toLowerCase().endsWith('.md')
+            !linkPath
+                .toLowerCase()
+                .endsWith('.md')
         ) {
             return
         }
@@ -7633,10 +8464,29 @@
             return
         }
 
-        const resolvedPath =
-            resolveRelativePath(
-                href,
-            )
+        let resolvedPath = null
+
+        if (linkPath.startsWith('/')) {
+            const root =
+                normalizePath(
+                    wikiRoot.value,
+                )
+
+            const rootRelativePath =
+                linkPath
+                    .replace(/^\/+/, '')
+
+            resolvedPath =
+                normalizePath(
+                    root + '/' +
+                    rootRelativePath,
+                )
+        } else {
+            resolvedPath =
+                resolveRelativePath(
+                    linkPath,
+                )
+        }
 
         if (
             !resolvedPath ||
@@ -7647,7 +8497,168 @@
             return
         }
 
-        openFile(resolvedPath)
+        const currentPath =
+            normalizePath(
+                selectedFile.value,
+            )
+
+        const navigatedToAnotherFile =
+            normalizePath(resolvedPath) !==
+            currentPath
+
+        if (navigatedToAnotherFile) {
+            await openFile(resolvedPath)
+
+            /*
+             * Mermaid diagrams can substantially change the document
+             * height after the Markdown article first appears. If we
+             * scroll to an anchor before Mermaid finishes rendering,
+             * the target is pushed down afterwards and the page appears
+             * not to have scrolled. Wait for the final diagram layout
+             * before applying a cross-file anchor.
+             */
+            await nextTick()
+            await renderMermaidDiagrams()
+
+            await new Promise((resolve) => {
+                window.requestAnimationFrame(() => {
+                    window.requestAnimationFrame(
+                        resolve,
+                    )
+                })
+            })
+        }
+
+        if (headingId) {
+            await scrollToHeading(
+                headingId,
+            )
+        }
+    }
+
+    function createHeadingSlug(text) {
+        return String(text || '')
+            .trim()
+            .toLowerCase()
+            .normalize('NFKD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/<[^>]*>/g, '')
+            .replace(/&[a-z0-9#]+;/gi, '')
+            .replace(/[^\p{L}\p{N}\s-]/gu, '')
+            .replace(/\s+/g, '-')
+            .replace(/-+/g, '-')
+            .replace(/^-|-$/g, '') ||
+            'section'
+    }
+
+    function extractTableOfContents(content) {
+        if (!content) {
+            return []
+        }
+
+        const headings = []
+        const slugCounts = new Map()
+        const lines = String(content).split(/\r?\n/)
+        let fence = ''
+
+        for (const line of lines) {
+            const fenceMatch =
+                line.match(/^\s*(`{3,}|~{3,})/)
+
+            if (fenceMatch) {
+                const marker =
+                    fenceMatch[1][0]
+
+                if (!fence) {
+                    fence = marker
+                } else if (
+                    marker === fence
+                ) {
+                    fence = ''
+                }
+
+                continue
+            }
+
+            if (fence) {
+                continue
+            }
+
+            const match =
+                line.match(
+                    /^\s{0,3}(#{1,3})\s+(.+?)\s*#*\s*$/,
+                )
+
+            if (!match) {
+                continue
+            }
+
+            const level =
+                match[1].length
+
+            const text =
+                match[2]
+                    .replace(
+                        /!\[([^\]]*)\]\([^)]*\)/g,
+                        '$1',
+                    )
+                    .replace(
+                        /\[([^\]]+)\]\([^)]*\)/g,
+                        '$1',
+                    )
+                    .replace(
+                        /[*_~`]/g,
+                        '',
+                    )
+                    .trim()
+
+            if (!text) {
+                continue
+            }
+
+            const baseSlug =
+                createHeadingSlug(text)
+
+            const count =
+                slugCounts.get(baseSlug) || 0
+
+            slugCounts.set(
+                baseSlug,
+                count + 1,
+            )
+
+            headings.push({
+                level,
+                text,
+                id:
+                    count === 0
+                        ? baseSlug
+                        : `${baseSlug}-${count + 1}`,
+            })
+        }
+
+        return headings
+    }
+
+    function getHeadingIdFactory() {
+        const slugCounts = new Map()
+
+        return (text) => {
+            const baseSlug =
+                createHeadingSlug(text)
+
+            const count =
+                slugCounts.get(baseSlug) || 0
+
+            slugCounts.set(
+                baseSlug,
+                count + 1,
+            )
+
+            return count === 0
+                ? baseSlug
+                : `${baseSlug}-${count + 1}`
+        }
     }
 
     function renderMarkdown(content) {
@@ -7656,18 +8667,64 @@
         }
 
         const renderer = new marked.Renderer()
+        const getHeadingId =
+            getHeadingIdFactory()
 
-        renderer.code = ({
-            text,
-            lang,
+        renderer.heading = ({
+            tokens,
+            depth,
         }) => {
+            const headingText =
+                renderer.parser.parseInline(
+                    tokens,
+                )
+
+            const plainText =
+                tokens
+                    .map(token => token.text || '')
+                    .join('')
+
+            const id =
+                getHeadingId(plainText)
+
+            return (
+                `<h${depth} id="${id}">` +
+                headingText +
+                `</h${depth}>`
+            )
+        }
+
+        renderer.code = (token) => {
+            const text =
+                typeof token === 'string'
+                    ? token
+                    : token?.text || ''
+
+            const lang =
+                typeof token === 'object'
+                    ? (
+                        token?.lang ||
+                        token?.language ||
+                        ''
+                    )
+                    : ''
+
             const language =
                 lang
-                    ? lang
+                    ? String(lang)
                         .trim()
                         .split(/\s+/)[0]
                         .toLowerCase()
                     : ''
+
+            if (language === 'mermaid') {
+                return (
+                    '<div class="mermaid-diagram" ' +
+                    `data-mermaid-source="${encodeURIComponent(text)}">` +
+                    '<div class="mermaid-diagram-loading">Rendering diagram…</div>' +
+                    '</div>'
+                )
+            }
 
             let highlightedCode
 
@@ -7717,7 +8774,382 @@
 
         return DOMPurify.sanitize(
             htmlWithImages,
+            {
+                ADD_ATTR: [
+                    'data-mermaid-source',
+                ],
+            },
         )
+    }
+
+    function isDarkNextcloudTheme() {
+        const target =
+            document.querySelector(
+                '#markdown-wiki-app .markdown-wiki',
+            ) ||
+            document.querySelector(
+                '#markdown-wiki-app',
+            ) ||
+            document.body
+
+        const background =
+            window
+                .getComputedStyle(target)
+                .backgroundColor
+
+        const channels =
+            background
+                .match(/[\d.]+/g)
+                ?.slice(0, 3)
+                .map(Number)
+
+        if (!channels || channels.length < 3) {
+            return window.matchMedia(
+                '(prefers-color-scheme: dark)',
+            ).matches
+        }
+
+        const [red, green, blue] =
+            channels
+
+        const luminance =
+            (
+                0.2126 * red +
+                0.7152 * green +
+                0.0722 * blue
+            ) / 255
+
+        return luminance < 0.5
+    }
+
+    let mermaidRenderGeneration = 0
+
+    async function renderMermaidDiagrams() {
+        await nextTick()
+
+        await new Promise((resolve) => {
+            window.requestAnimationFrame(() => {
+                window.requestAnimationFrame(resolve)
+            })
+        })
+
+        const generation =
+            ++mermaidRenderGeneration
+
+        const containers =
+            document.querySelectorAll(
+                '#markdown-wiki-app .mermaid-diagram[data-mermaid-source]',
+            )
+
+        if (!containers.length) {
+            return
+        }
+
+        const darkTheme =
+            isDarkNextcloudTheme()
+
+        mermaid.initialize({
+            startOnLoad: false,
+            securityLevel: 'strict',
+            theme: darkTheme
+                ? 'dark'
+                : 'default',
+            suppressErrorRendering: true,
+            themeVariables: darkTheme
+                ? {
+                    darkMode: true,
+                    background: '#1e1e1e',
+                    primaryColor: '#2c2c2c',
+                    primaryTextColor: '#f2f2f2',
+                    primaryBorderColor: '#8c7cff',
+                    lineColor: '#c8c8c8',
+                    secondaryColor: '#252525',
+                    secondaryTextColor: '#f2f2f2',
+                    tertiaryColor: '#303030',
+                    tertiaryTextColor: '#f2f2f2',
+                    textColor: '#f2f2f2',
+                    actorBkg: '#2c2c2c',
+                    actorBorder: '#8c7cff',
+                    actorTextColor: '#f2f2f2',
+                    actorLineColor: '#8c7cff',
+                    signalColor: '#c8c8c8',
+                    signalTextColor: '#f2f2f2',
+                    labelBoxBkgColor: '#252525',
+                    labelBoxBorderColor: '#666666',
+                    labelTextColor: '#f2f2f2',
+                    loopTextColor: '#f2f2f2',
+                    noteBkgColor: '#333333',
+                    noteBorderColor: '#777777',
+                    noteTextColor: '#f2f2f2',
+                }
+                : {
+                    darkMode: false,
+                    background: '#ffffff',
+                    primaryColor: '#f4f6f8',
+                    primaryTextColor: '#1f1f1f',
+                    primaryBorderColor: '#6b7280',
+                    lineColor: '#4b5563',
+                    secondaryColor: '#eef2f6',
+                    secondaryTextColor: '#1f1f1f',
+                    tertiaryColor: '#ffffff',
+                    tertiaryTextColor: '#1f1f1f',
+                    textColor: '#1f1f1f',
+                    actorBkg: '#f4f6f8',
+                    actorBorder: '#6b7280',
+                    actorTextColor: '#1f1f1f',
+                    actorLineColor: '#6b7280',
+                    signalColor: '#4b5563',
+                    signalTextColor: '#1f1f1f',
+                    labelBoxBkgColor: '#ffffff',
+                    labelBoxBorderColor: '#9ca3af',
+                    labelTextColor: '#1f1f1f',
+                    loopTextColor: '#1f1f1f',
+                    noteBkgColor: '#fff8d8',
+                    noteBorderColor: '#b8a45a',
+                    noteTextColor: '#1f1f1f',
+                },
+        })
+
+        let index = 0
+
+        for (const container of containers) {
+            if (
+                generation !==
+                mermaidRenderGeneration
+            ) {
+                return
+            }
+
+            const encodedSource =
+                container.getAttribute(
+                    'data-mermaid-source',
+                )
+
+            if (!encodedSource) {
+                continue
+            }
+
+            let source = ''
+
+            try {
+                source =
+                    decodeURIComponent(
+                        encodedSource,
+                    )
+            } catch {
+                source = encodedSource
+            }
+
+            try {
+                const id =
+                    `markdown-wiki-mermaid-${generation}-${index++}`
+
+                const { svg } =
+                    await mermaid.render(
+                        id,
+                        source,
+                    )
+
+                if (
+                    generation !==
+                    mermaidRenderGeneration
+                ) {
+                    return
+                }
+
+                container.innerHTML = svg
+                container.classList.remove(
+                    'mermaid-diagram-error',
+                )
+            } catch (err) {
+                console.warn(
+                    'Failed to render Mermaid diagram.',
+                    err,
+                )
+
+                container.classList.add(
+                    'mermaid-diagram-error',
+                )
+
+                container.textContent =
+                    'Unable to render Mermaid diagram.'
+            }
+        }
+    }
+
+    function getVisibleMarkdownContent() {
+        const container =
+            documentScrollElement.value
+
+        if (!container) {
+            return null
+        }
+
+        const candidates =
+            [...container.querySelectorAll(
+                '.markdown-content',
+            )]
+
+        return candidates.find((element) => {
+            const style =
+                window.getComputedStyle(
+                    element,
+                )
+
+            return (
+                style.display !== 'none' &&
+                style.visibility !== 'hidden'
+            )
+        }) || null
+    }
+
+    function updateActiveHeading() {
+        if (!showTableOfContents.value) {
+            activeHeadingId.value = ''
+            return
+        }
+
+        const container =
+            documentScrollElement.value
+
+        const content =
+            getVisibleMarkdownContent()
+
+        if (
+            !container ||
+            !content
+        ) {
+            return
+        }
+
+        const headings =
+            [...content.querySelectorAll(
+                'h1[id], h2[id], h3[id]',
+            )]
+
+        if (!headings.length) {
+            activeHeadingId.value = ''
+            return
+        }
+
+        const containerTop =
+            container.getBoundingClientRect().top
+
+        const activationLine =
+            containerTop + 48
+
+        let active =
+            headings[0]
+
+        for (const heading of headings) {
+            if (
+                heading.getBoundingClientRect().top <=
+                activationLine
+            ) {
+                active = heading
+            } else {
+                break
+            }
+        }
+
+        activeHeadingId.value =
+            active.id
+    }
+
+    async function scrollToHeading(id) {
+        if (!id) {
+            return false
+        }
+
+        let decodedId = id
+
+        try {
+            decodedId =
+                decodeURIComponent(id)
+        } catch {
+            decodedId = id
+        }
+
+        const candidateIds =
+            [
+                decodedId,
+                createHeadingSlug(decodedId),
+            ].filter(
+                (value, index, values) =>
+                    value &&
+                    values.indexOf(value) === index,
+            )
+
+        /*
+         * Cross-file navigation can finish loading before Vue has
+         * committed the new article and its final layout to the DOM.
+         * Retry until the real target heading exists.
+         */
+        for (
+            let attempt = 0;
+            attempt < 30;
+            attempt++
+        ) {
+            await nextTick()
+
+            await new Promise((resolve) => {
+                window.requestAnimationFrame(
+                    resolve,
+                )
+            })
+
+            const container =
+                documentScrollElement.value
+
+            const content =
+                getVisibleMarkdownContent()
+
+            if (
+                !container ||
+                !content
+            ) {
+                continue
+            }
+
+            const heading =
+                [...content.querySelectorAll(
+                    'h1[id], h2[id], h3[id]',
+                )].find(
+                    element =>
+                        candidateIds.includes(
+                            element.id,
+                        ),
+                )
+
+            if (!heading) {
+                continue
+            }
+
+            heading.scrollIntoView({
+                behavior: 'auto',
+                block: 'start',
+                inline: 'nearest',
+            })
+
+            await new Promise((resolve) => {
+                window.requestAnimationFrame(
+                    resolve,
+                )
+            })
+
+            container.scrollTop =
+                Math.max(
+                    0,
+                    container.scrollTop - 24,
+                )
+
+            activeHeadingId.value =
+                heading.id
+
+            return true
+        }
+
+        return false
     }
 
     async function chooseWikiRoot() {
@@ -7889,6 +9321,22 @@
         )
     })
 
+    const previousMarkdownDisplayName = computed(() => {
+        return previousMarkdownPath.value
+            ? getDisplayFileName(
+                previousMarkdownPath.value,
+            )
+            : ''
+    })
+
+    const nextMarkdownDisplayName = computed(() => {
+        return nextMarkdownPath.value
+            ? getDisplayFileName(
+                nextMarkdownPath.value,
+            )
+            : ''
+    })
+
     const currentFolderName = computed(() => {
         if (!currentFolder.value) {
             return wikiRootName.value
@@ -7897,6 +9345,97 @@
         return getNameFromPath(
             currentFolder.value,
         )
+    })
+
+    const currentFolderLoading = ref(false)
+
+    const folderBreadcrumbs = computed(() => {
+        if (
+            !currentFolder.value ||
+            !wikiRoot.value
+        ) {
+            return []
+        }
+
+        const root =
+            normalizePath(wikiRoot.value)
+
+        const folderPath =
+            normalizePath(currentFolder.value)
+
+        if (folderPath === root) {
+            return []
+        }
+
+        const relative =
+            folderPath
+                .slice(root.length)
+                .split('/')
+                .filter(Boolean)
+
+        let path = root
+
+        return relative.map((name) => {
+            path =
+                normalizePath(
+                    path + '/' + name,
+                )
+
+            return {
+                name,
+                path,
+            }
+        })
+    })
+
+    const currentFolderItems = computed(() => {
+        const folderPath =
+            normalizePath(
+                currentFolder.value ||
+                    wikiRoot.value,
+            )
+
+        if (!folderPath) {
+            return []
+        }
+
+        let items = []
+
+        if (
+            folderPath ===
+            normalizePath(wikiRoot.value)
+        ) {
+            items = tree.value || []
+        } else {
+            const node =
+                findNode(
+                    tree.value,
+                    folderPath,
+                )
+
+            items =
+                node?.type === 'folder'
+                    ? node.children || []
+                    : []
+        }
+
+        return [...items].sort((a, b) => {
+            if (a.type !== b.type) {
+                return a.type === 'folder'
+                    ? -1
+                    : 1
+            }
+
+            return String(a.name || '')
+                .localeCompare(
+                    String(b.name || ''),
+                    undefined,
+                    {
+                        numeric: true,
+                        sensitivity: 'base',
+                    },
+                )
+        })
     })
 
     const parentFolder = computed(() => {
@@ -7996,6 +9535,26 @@
         return 'Saved'
     })
 
+    const tableOfContents = computed(() => {
+        return extractTableOfContents(
+            editing.value
+                ? editedMarkdown.value
+                : markdown.value,
+        )
+    })
+
+    const showTableOfContents = computed(() => {
+        return (
+            tableOfContentsVisible.value &&
+            tableOfContents.value.length > 0 &&
+            (
+                !editing.value ||
+                editorMode.value !==
+                    'markdown'
+            )
+        )
+    })
+
     const renderedMarkdown = computed(() => {
         return renderMarkdown(
             markdown.value,
@@ -8007,6 +9566,30 @@
             editedMarkdown.value,
         )
     })
+
+    watch(
+        [
+            tableOfContents,
+            editorMode,
+            selectedFile,
+            renderedMarkdown,
+            renderedEditorMarkdown,
+            loadingFile,
+            editing,
+        ],
+        async () => {
+            await nextTick()
+
+            window.requestAnimationFrame(
+                updateActiveHeading,
+            )
+
+            await renderMermaidDiagrams()
+        },
+        {
+            flush: 'post',
+        },
+    )
 
     const ResourceIcon = defineComponent({
         name: 'ResourceIcon',
@@ -8295,7 +9878,49 @@
                 return h(
                     'li',
                     {
-                        class: 'tree-item',
+                        class: [
+                            'tree-item',
+                            {
+                                'tree-item-drop-scope-valid':
+                                    props.node.type ===
+                                        'folder' &&
+                                    normalizePath(
+                                        props.dropTargetPath,
+                                    ) === nodePath &&
+                                    props.dropTargetValid,
+
+                                'tree-item-drop-scope-invalid':
+                                    props.node.type ===
+                                        'folder' &&
+                                    normalizePath(
+                                        props.dropTargetPath,
+                                    ) === nodePath &&
+                                    !props.dropTargetValid,
+                            },
+                        ],
+
+                        style:
+                            props.node.type ===
+                                'folder' &&
+                            normalizePath(
+                                props.dropTargetPath,
+                            ) === nodePath
+                                ? {
+                                    borderRadius:
+                                        'var(--border-radius-element)',
+                                    outline:
+                                        props.dropTargetValid
+                                            ? '2px solid var(--color-primary-element)'
+                                            : '2px solid var(--color-error)',
+                                    outlineOffset:
+                                        '-2px',
+                                    background:
+                                        props.dropTargetValid
+                                            ? 'var(--color-primary-element-light)'
+                                            : 'transparent',
+                                }
+                                : null,
+
                         'data-tree-path':
                             normalizePath(
                                 props.node.path,
@@ -8811,8 +10436,38 @@
         scheduleSearch()
     })
 
+    let mermaidThemeObserver = null
+
     onMounted(() => {
         loadSearchHistory()
+
+        mermaidThemeObserver =
+            new MutationObserver(() => {
+                renderMermaidDiagrams()
+            })
+
+        mermaidThemeObserver.observe(
+            document.documentElement,
+            {
+                attributes: true,
+                attributeFilter: [
+                    'class',
+                    'data-theme',
+                ],
+            },
+        )
+
+        mermaidThemeObserver.observe(
+            document.body,
+            {
+                attributes: true,
+                attributeFilter: [
+                    'class',
+                    'data-theme',
+                    'style',
+                ],
+            },
+        )
 
         document.addEventListener(
             'click',
@@ -8844,6 +10499,13 @@
     })
 
     onBeforeUnmount(() => {
+        mermaidRenderGeneration++
+
+        if (mermaidThemeObserver) {
+            mermaidThemeObserver.disconnect()
+            mermaidThemeObserver = null
+        }
+
         document.removeEventListener(
             'click',
             handleDocumentClick,

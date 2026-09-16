@@ -163,9 +163,9 @@
 	display: inline-flex !important;
 	align-items: center !important;
 	justify-content: center !important;
-	min-height: 32px !important;
-	margin-top: 10px !important;
-	padding: 5px 12px !important;
+	min-height: 36px !important;
+	margin-top: 12px !important;
+	padding: 7px 14px !important;
 	border: 0 !important;
 	border-radius: 8px !important;
 	background: var(--color-primary-element) !important;
@@ -173,7 +173,7 @@
 	color: var(--color-primary-element-text) !important;
 	cursor: pointer !important;
 	font: inherit !important;
-	font-size: 12px !important;
+	font-size: 13px !important;
 	font-weight: 600 !important;
 	line-height: 1.3 !important;
 	appearance: none !important;
@@ -210,20 +210,12 @@
  * File tree
  */
 
-.file-tree-section {
-	display: flex;
-	flex-direction: column;
-	flex: 1 1 auto;
-	min-height: 0;
-	overflow: hidden;
-}
-
 .file-tree {
 	flex: 1 1 auto;
 	min-height: 0;
-	overflow-x: auto;
+	overflow-x: hidden;
 	overflow-y: auto;
-	padding: 4px 8px 12px;
+	padding: 10px 8px 12px;
 	scrollbar-width: thin;
 }
 
@@ -233,15 +225,12 @@
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	flex: 0 0 auto;
 	width: 100%;
 	min-width: 0;
-	min-height: 42px;
-	padding: 6px 16px;
+	min-height: 30px;
+	padding: 4px 8px 6px;
 	box-sizing: border-box;
 	overflow: visible;
-	border-bottom: 1px solid var(--color-border);
-	background: var(--color-background-hover);
 }
 
 .tree-header {
@@ -498,21 +487,13 @@
 }
 
 .tree-list {
-	display: block;
-	width: max-content;
-	min-width: 100%;
 	margin: 0;
 	padding: 0;
-	box-sizing: border-box;
 	list-style: none;
 }
 
 .tree-item {
-	display: block;
-	width: max-content;
-	min-width: 100%;
 	margin: 1px 0;
-	box-sizing: border-box;
 }
 
 /*
@@ -520,13 +501,11 @@
  */
 
 .tree-button {
-	display: inline-flex;
+	display: flex;
 	align-items: center;
-	width: max-content;
-	min-width: 100%;
+	width: 100%;
 	min-height: 34px;
 	padding: 5px 8px;
-	box-sizing: border-box;
 	border: 0 !important;
 	border-radius: var(--border-radius-element);
 	outline: none;
@@ -658,13 +637,9 @@
  */
 
 .tree-name {
-	display: inline-block;
-	flex: 0 0 auto;
-	width: max-content;
-	min-width: max-content;
-	max-width: none;
-	overflow: visible;
-	text-overflow: clip;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
 	white-space: nowrap;
 }
 
@@ -1530,8 +1505,20 @@
 	text-underline-offset: 2px;
 }
 
-.markdown-content a:hover {
-	color: var(--color-primary-element-text);
+.markdown-content a:visited {
+	color: var(--color-primary-element);
+}
+
+.markdown-content a:hover,
+.markdown-content a:focus-visible {
+	color: var(--color-primary-element-hover);
+	text-decoration: underline;
+}
+
+.markdown-content a:focus-visible {
+	outline: 2px solid var(--color-primary-element);
+	outline-offset: 2px;
+	border-radius: 2px;
 }
 
 /*
@@ -1720,7 +1707,8 @@
  */
 
 .markdown-content table {
-	width: 100%;
+	display: block;
+	width: max-content;
 	max-width: 100%;
 	margin: 1.5em 0;
 	border-collapse: separate;
@@ -1960,6 +1948,9 @@
  */
 
 .markdown-editor-toolbar {
+	position: sticky;
+	top: 0;
+	z-index: 100;
 	display: flex;
 	align-items: center;
 	flex-wrap: wrap;
@@ -1972,6 +1963,7 @@
 	border: 1px solid var(--color-border);
 	border-radius: var(--border-radius-element);
 	background: var(--color-background-hover);
+	box-shadow: 0 4px 10px rgb(0 0 0 / 10%);
 }
 
 .markdown-editor-toolbar-group {
@@ -2068,6 +2060,69 @@
 .markdown-editor-toolbar-select option {
 	background: var(--color-main-background);
 	color: var(--color-main-text);
+}
+
+
+
+/*
+ * Mermaid diagram toolbar dropdown
+ */
+.markdown-toolbar-diagram-wrapper {
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	flex: 0 0 auto;
+}
+
+.markdown-toolbar-diagram-menu {
+	position: absolute;
+	top: calc(100% + 6px);
+	left: 0;
+	z-index: 1000;
+	display: flex;
+	flex-direction: column;
+	align-items: stretch;
+	width: max-content;
+	min-width: 180px;
+	padding: 4px;
+	box-sizing: border-box;
+	border: 1px solid var(--color-border);
+	border-radius: var(--border-radius-element);
+	background: var(--color-main-background);
+	box-shadow: 0 4px 16px rgb(0 0 0 / 18%);
+}
+
+.markdown-toolbar-diagram-item {
+	display: flex;
+	align-items: center;
+	width: 100%;
+	min-height: 34px;
+	padding: 6px 10px;
+	box-sizing: border-box;
+	border: 0 !important;
+	border-radius: var(--border-radius-element);
+	background: transparent !important;
+	box-shadow: none !important;
+	color: var(--color-main-text);
+	cursor: pointer;
+	font: inherit;
+	font-size: 13px;
+	font-weight: 500;
+	line-height: 1.3;
+	text-align: left;
+	white-space: nowrap;
+	appearance: none;
+}
+
+.markdown-toolbar-diagram-item:hover,
+.markdown-toolbar-diagram-item:focus-visible {
+	background: var(--color-background-hover) !important;
+	color: var(--color-main-text);
+}
+
+.markdown-toolbar-diagram-item:focus-visible {
+	outline: 2px solid var(--color-primary-element);
+	outline-offset: -2px;
 }
 
 /*
@@ -2217,6 +2272,172 @@
 .editor-save-error {
 	background: var(--color-background-hover);
 	color: var(--color-error);
+}
+
+
+/*
+ * Document body / Table of contents
+ */
+
+.document-body-layout {
+	width: 100%;
+	min-width: 0;
+	max-width: 1100px;
+	margin: 0 auto;
+	box-sizing: border-box;
+}
+
+.document-body-layout-with-toc {
+	display: grid;
+	grid-template-columns:
+		minmax(0, 1fr)
+		220px;
+	align-items: start;
+	gap: 32px;
+	width: 100%;
+	max-width: 1380px;
+}
+
+.document-body-main {
+	min-width: 0;
+	max-width: 100%;
+	/*
+	 * Do not create an intermediate overflow container here.
+	 * The Markdown formatting toolbar uses position: sticky and must
+	 * stick against .wiki-document-scroll, which is the real document
+	 * scrolling container. Horizontal overflow is already clipped by
+	 * .wiki-document-scroll and handled locally by tables/code blocks.
+	 */
+	overflow: visible;
+}
+
+.document-body-main .markdown-content {
+	min-width: 0;
+	max-width: 100%;
+}
+
+.document-body-main .markdown-content table {
+	display: block;
+	width: max-content;
+	max-width: 100%;
+	overflow-x: auto;
+	overflow-y: hidden;
+}
+
+.document-body-main .markdown-content pre {
+	width: 100%;
+	max-width: 100%;
+}
+
+.document-body-main .markdown-content a {
+	overflow-wrap: anywhere;
+	word-break: break-word;
+}
+
+.document-body-layout .document-body-main > .markdown-content,
+.document-body-layout .editor-preview-only .markdown-content {
+	max-width: 1100px;
+}
+
+.wiki-toc {
+	position: relative;
+	z-index: 1;
+	min-width: 0;
+	max-width: 220px;
+	align-self: stretch;
+	background: var(--color-main-background);
+}
+
+.wiki-toc-inner {
+	position: sticky;
+	top: 24px;
+	max-height: calc(100vh - 190px);
+	overflow-y: auto;
+	padding: 4px 0 12px 16px;
+	border-left: 1px solid var(--color-border);
+	box-sizing: border-box;
+	scrollbar-width: thin;
+}
+
+.wiki-toc-title {
+	margin: 0 0 10px;
+	color: var(--color-text-maxcontrast);
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: 0.04em;
+	line-height: 1.3;
+	text-transform: uppercase;
+}
+
+.wiki-toc-nav {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.wiki-toc-link {
+	display: block;
+	width: 100%;
+	min-width: 0;
+	min-height: 28px;
+	margin: 0;
+	padding: 5px 8px;
+	overflow: hidden;
+	border: 0 !important;
+	border-radius: 6px;
+	background: transparent !important;
+	box-shadow: none !important;
+	color: var(--color-text-maxcontrast);
+	cursor: pointer;
+	font: inherit;
+	font-size: 12px;
+	font-weight: 500;
+	line-height: 1.4;
+	text-align: left;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	appearance: none;
+}
+
+.wiki-toc-link:hover {
+	background: var(--color-background-hover) !important;
+	color: var(--color-main-text);
+}
+
+.wiki-toc-link:focus-visible {
+	outline: 2px solid var(--color-primary-element);
+	outline-offset: -2px;
+}
+
+.wiki-toc-link-active {
+	background: var(--color-primary-element-light) !important;
+	color: var(--color-main-text);
+	font-weight: 600;
+}
+
+.wiki-toc-level-2 {
+	padding-left: 18px;
+}
+
+.wiki-toc-level-3 {
+	padding-left: 30px;
+}
+
+.markdown-content h1[id],
+.markdown-content h2[id],
+.markdown-content h3[id] {
+	scroll-margin-top: 24px;
+}
+
+@media (max-width: 1180px) {
+	.document-body-layout-with-toc {
+		display: block;
+		max-width: 1100px;
+	}
+
+	.wiki-toc {
+		display: none;
+	}
 }
 
 /*
@@ -2465,7 +2686,6 @@
 	line-height: 1.45;
 	-webkit-box-orient: vertical;
 	-webkit-line-clamp: 3;
-	line-clamp: 3;
 }
 
 /*
@@ -2838,149 +3058,403 @@
 	}
 }
 
+
+.document-toc-toggle-active {
+	background: var(--color-primary-element-light) !important;
+}
+
+@media (max-width: 1280px) {
+	.document-body-layout-with-toc {
+		display: block;
+		max-width: 1100px;
+	}
+
+	.wiki-toc {
+		display: none;
+	}
+}
+
+
 /*
- * Compact fixed tree toolbar.
- * FILES/+ remain on the left and the filter switch remains fully visible.
+ * File tree scrolling fix
  */
-.tree-header-row {
-	gap: 6px;
-	padding-right: 10px;
-	padding-left: 10px;
+.wiki-sidebar {
+	overflow: hidden;
 }
 
-.tree-header-left {
-	flex: 0 0 auto;
-	min-width: 0;
-	gap: 5px;
-}
-
-.tree-header-actions {
+.file-tree-section {
 	display: flex;
-	align-items: center;
-	justify-content: flex-end;
+	flex: 1 1 auto;
+	flex-direction: column;
+	min-width: 0;
+	min-height: 0;
+	overflow: hidden;
+}
+
+.tree-header-row {
+	flex: 0 0 auto;
+}
+
+.file-tree {
 	flex: 1 1 auto;
 	min-width: 0;
-	gap: 2px;
+	min-height: 0;
+	overflow-x: auto;
+	overflow-y: auto;
+	padding: 4px 8px 12px;
+	scrollbar-width: thin;
 }
 
-.tree-filter-button {
-	flex: 0 1 auto;
-	min-width: 0;
-	padding-right: 9px !important;
-	padding-left: 9px !important;
+.tree-list {
+	display: block;
+	width: max-content;
+	min-width: 100%;
+	box-sizing: border-box;
+}
+
+.tree-item {
+	display: block;
+	width: max-content;
+	min-width: 100%;
+	box-sizing: border-box;
+}
+
+.tree-button {
+	display: inline-flex;
+	align-items: center;
+	width: max-content;
+	min-width: 100%;
+}
+
+.tree-name {
+	flex: 0 0 auto;
+	min-width: max-content;
+	overflow: visible;
+	text-overflow: clip;
 	white-space: nowrap;
 }
 
-.tree-filter-button + .tree-filter-button {
-	margin-left: 0;
+/*
+ * Previous / Next page navigation
+ */
+
+.document-page-navigation {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+	gap: 16px;
+	width: 100%;
+	max-width: 1100px;
+	margin: 48px auto 0;
+	padding-top: 20px;
+	box-sizing: border-box;
+	border-top: 1px solid var(--color-border);
+}
+
+.document-page-navigation-button {
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	min-width: 0;
+	min-height: 64px;
+	margin: 0;
+	padding: 10px 14px;
+	box-sizing: border-box;
+	border: 1px solid var(--color-border) !important;
+	border-radius: 8px;
+	background: var(--color-main-background) !important;
+	box-shadow: none !important;
+	color: var(--color-main-text);
+	cursor: pointer;
+	font: inherit;
+	appearance: none;
+	transition:
+		background-color 80ms ease,
+		border-color 80ms ease;
+}
+
+.document-page-navigation-button:hover {
+	border-color: var(--color-border-dark) !important;
+	background: var(--color-background-hover) !important;
+}
+
+.document-page-navigation-button:focus-visible {
+	outline: 2px solid var(--color-primary-element);
+	outline-offset: 2px;
+}
+
+.document-page-navigation-previous {
+	align-items: flex-start;
+	text-align: left;
+}
+
+.document-page-navigation-next {
+	align-items: flex-end;
+	text-align: right;
+}
+
+.document-page-navigation-direction {
+	color: var(--color-text-maxcontrast);
+	font-size: 11px;
+	font-weight: 600;
+	line-height: 1.3;
+}
+
+.document-page-navigation-name {
+	display: block;
+	width: 100%;
+	min-width: 0;
+	margin-top: 4px;
+	overflow: hidden;
+	color: var(--color-main-text);
+	font-size: 14px;
+	font-weight: 600;
+	line-height: 1.35;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.document-page-navigation-spacer {
+	min-width: 0;
+}
+
+@media (max-width: 700px) {
+	.document-page-navigation {
+		grid-template-columns: minmax(0, 1fr);
+		gap: 10px;
+		margin-top: 36px;
+	}
+
+	.document-page-navigation-spacer {
+		display: none;
+	}
+
+	.document-page-navigation-button {
+		width: 100%;
+	}
+
+	.document-page-navigation-next {
+		align-items: flex-start;
+		text-align: left;
+	}
 }
 
 /*
- * Balanced fixed tree toolbar.
- * FILES/+ use only their natural width; the Markdown/All files switch
- * receives all remaining sidebar width and splits it evenly.
+ * Folder View
  */
-.tree-header-row {
+
+.wiki-folder-view {
 	display: flex;
-	align-items: center;
+	flex: 1 1 auto;
+	flex-direction: column;
 	width: 100%;
-	gap: 8px;
-	padding-right: 8px;
-	padding-left: 8px;
+	min-width: 0;
+	min-height: 0;
 	overflow: hidden;
+	background: var(--color-main-background);
 }
 
-.tree-header-left {
+.folder-view-toolbar {
 	display: flex;
 	align-items: center;
 	flex: 0 0 auto;
-	width: auto;
+	width: 100%;
 	min-width: 0;
-	gap: 5px;
+	min-height: 52px;
+	padding: 0 48px;
+	box-sizing: border-box;
+	border-bottom: 1px solid var(--color-border);
+	background: var(--color-background-hover);
 }
 
-.tree-header-actions {
-	display: grid;
-	grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-	flex: 1 1 0;
-	width: auto;
+.folder-view-scroll {
+	flex: 1 1 auto;
+	width: 100%;
 	min-width: 0;
-	gap: 2px;
+	min-height: 0;
+	overflow-x: hidden;
+	overflow-y: auto;
+	box-sizing: border-box;
+	scrollbar-width: thin;
 }
 
-.tree-filter-button {
+.folder-view-content {
+	width: 100%;
+	max-width: 1100px;
+	margin: 0 auto;
+	padding: 32px 48px 64px;
+	box-sizing: border-box;
+}
+
+.folder-view-heading {
+	display: flex;
+	align-items: flex-end;
+	justify-content: space-between;
+	gap: 24px;
+	margin: 0 0 22px;
+}
+
+.folder-view-heading h2 {
+	margin: 0;
+	color: var(--color-main-text);
+	font-size: 30px;
+	font-weight: 600;
+	line-height: 1.25;
+	letter-spacing: -0.01em;
+}
+
+.folder-view-heading p {
+	margin: 6px 0 0;
+	color: var(--color-text-maxcontrast);
+	font-size: 13px;
+	line-height: 1.4;
+}
+
+.folder-view-list {
+	width: 100%;
+	min-width: 0;
+	border-top: 1px solid var(--color-border);
+}
+
+.folder-view-item {
+	display: grid !important;
+	grid-template-columns: 32px minmax(0, 1fr) 24px;
+	align-items: center;
+	gap: 12px;
+	width: 100% !important;
+	min-width: 0;
+	min-height: 56px;
+	margin: 0 !important;
+	padding: 8px 12px !important;
+	box-sizing: border-box;
+	border: 0 !important;
+	border-bottom: 1px solid var(--color-border) !important;
+	border-radius: 0 !important;
+	background: transparent !important;
+	box-shadow: none !important;
+	color: var(--color-main-text);
+	cursor: pointer;
+	font: inherit;
+	text-align: left;
+	appearance: none;
+	transition: background-color 80ms ease;
+}
+
+.folder-view-item:hover {
+	background: var(--color-background-hover) !important;
+}
+
+.folder-view-item:focus-visible {
+	position: relative;
+	z-index: 1;
+	outline: 2px solid var(--color-primary-element);
+	outline-offset: -2px;
+}
+
+.folder-view-item-icon {
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	width: 100%;
+	width: 32px;
+	height: 32px;
+	color: var(--color-primary-element);
+	font-size: 18px;
+	line-height: 1;
+}
+
+.folder-view-item-main {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 24px;
 	min-width: 0;
-	max-width: none;
-	padding: 6px 5px !important;
-	box-sizing: border-box;
+}
+
+.folder-view-item-name {
+	flex: 1 1 auto;
+	min-width: 0;
 	overflow: hidden;
-	text-align: center;
+	color: var(--color-main-text);
+	font-size: 14px;
+	font-weight: 600;
+	line-height: 1.35;
+	text-overflow: ellipsis;
 	white-space: nowrap;
 }
 
-.tree-filter-button + .tree-filter-button {
-	margin-left: 0;
+.folder-view-item-type {
+	flex: 0 0 120px;
+	width: 120px;
+	color: var(--color-text-maxcontrast);
+	font-size: 12px;
+	font-weight: 400;
+	line-height: 1.35;
+	text-align: left;
+	white-space: nowrap;
 }
 
-/*
- * Fixed FILES toolbar sizing.
- * These are the actual classes used by App.vue.
- */
-.tree-header-row {
-	display: flex;
-	align-items: center;
-	justify-content: flex-start;
-	gap: 6px;
-	width: 100%;
-	min-width: 0;
-	padding: 6px 8px;
-	overflow: hidden;
-}
-
-.tree-header {
-	display: flex;
-	align-items: center;
-	flex: 0 0 auto;
-	min-width: 0;
-}
-
-.tree-view-toggle {
-	display: grid;
-	grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-	align-items: center;
-	flex: 1 1 0;
-	width: 0;
-	min-width: 0;
-	max-width: 100%;
-	margin-left: 0;
-	padding: 2px;
-	box-sizing: border-box;
-	overflow: hidden;
-}
-
-.tree-view-button {
+.folder-view-item-arrow {
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	width: 100%;
-	min-width: 0;
-	max-width: none;
-	min-height: 24px;
-	padding: 3px 4px;
-	box-sizing: border-box;
-	overflow: hidden;
-	text-align: center;
-	white-space: nowrap;
+	width: 24px;
+	height: 24px;
+	color: var(--color-text-maxcontrast);
+	font-size: 22px;
+	font-weight: 300;
+	line-height: 1;
 }
 
-/*
- * Symmetric horizontal spacing for the Markdown / All files selector.
- */
-.tree-view-toggle {
-	padding-right: 5px;
-	padding-left: 5px;
+.folder-view-empty {
+	width: 100%;
+	padding: 40px 16px;
+	box-sizing: border-box;
+	border-top: 1px solid var(--color-border);
+	color: var(--color-text-maxcontrast);
+	font-size: 14px;
+	line-height: 1.5;
+	text-align: center;
 }
+
+@media (max-width: 800px) {
+	.folder-view-toolbar {
+		padding-right: 24px;
+		padding-left: 24px;
+	}
+
+	.folder-view-content {
+		padding: 24px 24px 48px;
+	}
+
+	.folder-view-item-main {
+		flex-direction: column;
+		align-items: flex-start;
+		justify-content: center;
+		gap: 2px;
+	}
+
+	.folder-view-item-type {
+		flex: 0 0 auto;
+		width: auto;
+	}
+
+	.folder-view-item {
+		min-height: 62px;
+	}
+}
+
+.folder-view-item-icon svg {
+	display: block;
+	width: 18px;
+	height: 18px;
+}
+
+.folder-view-folder-icon {
+	color: var(--color-primary-element);
+}
+
+.folder-view-item-arrow svg {
+	display: block;
+	width: 16px;
+	height: 16px;
+}
+
