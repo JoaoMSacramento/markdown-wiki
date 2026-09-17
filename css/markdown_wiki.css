@@ -1592,10 +1592,22 @@
 	min-height: 16px !important;
 	margin: 0.34em 8px 0 0 !important;
 	padding: 0 !important;
-	border: 0 !important;
+	border: 1.5px solid var(--color-text-maxcontrast) !important;
+	border-radius: 3px !important;
 	outline: none !important;
-	appearance: auto !important;
-	-webkit-appearance: checkbox !important;
+	background: var(--color-main-background) !important;
+	box-shadow: none !important;
+	appearance: none !important;
+	-webkit-appearance: none !important;
+}
+
+.markdown-content ul:has(> li > input[type='checkbox']) > li > input[type='checkbox']:checked {
+	border-color: var(--color-primary-element) !important;
+	background-color: var(--color-primary-element) !important;
+	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.5 8.2 6.5 11 12.5 4.8' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") !important;
+	background-repeat: no-repeat !important;
+	background-position: center !important;
+	background-size: 14px 14px !important;
 }
 
 .markdown-content ul:has(> li > input[type='checkbox']) > li > p {
@@ -1614,9 +1626,6 @@
 	cursor: default;
 }
 
-.markdown-content ul:has(> li > input[type='checkbox']) > li > input[type='checkbox']:checked {
-	accent-color: var(--color-primary-element);
-}
 
 /*
  * Fallback for browsers / CSS environments where :has()
@@ -1658,10 +1667,22 @@
 	min-height: 16px !important;
 	margin: 0.34em 8px 0 0 !important;
 	padding: 0 !important;
-	border: 0 !important;
+	border: 1.5px solid var(--color-text-maxcontrast) !important;
+	border-radius: 3px !important;
 	outline: none !important;
-	appearance: auto !important;
-	-webkit-appearance: checkbox !important;
+	background: var(--color-main-background) !important;
+	box-shadow: none !important;
+	appearance: none !important;
+	-webkit-appearance: none !important;
+}
+
+.markdown-content ul.contains-task-list > li > input[type='checkbox']:checked {
+	border-color: var(--color-primary-element) !important;
+	background-color: var(--color-primary-element) !important;
+	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.5 8.2 6.5 11 12.5 4.8' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") !important;
+	background-repeat: no-repeat !important;
+	background-position: center !important;
+	background-size: 14px 14px !important;
 }
 
 .markdown-content ul.contains-task-list > li > input[type='checkbox'] + p {
@@ -1680,9 +1701,6 @@
 	cursor: default;
 }
 
-.markdown-content ul.contains-task-list > li > input[type='checkbox']:checked {
-	accent-color: var(--color-primary-element);
-}
 
 .markdown-content blockquote {
 	margin: 1.25em 0;

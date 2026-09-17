@@ -307,6 +307,40 @@
                                 >
                                     New folder
                                 </button>
+
+                                <button
+                                    type="button"
+                                    class="tree-create-menu-item"
+                                    @click="openUploadFilePicker"
+                                >
+                                    Upload file
+                                </button>
+
+                                <button
+                                    type="button"
+                                    class="tree-create-menu-item"
+                                    @click="openUploadFolderPicker"
+                                >
+                                    Upload folder
+                                </button>
+
+                                <input
+                                    ref="uploadFileInput"
+                                    type="file"
+                                    multiple
+                                    hidden
+                                    @change="handleUploadFileSelection"
+                                />
+
+                                <input
+                                    ref="uploadFolderInput"
+                                    type="file"
+                                    webkitdirectory
+                                    directory
+                                    multiple
+                                    hidden
+                                    @change="handleUploadFolderSelection"
+                                />
                             </div>
                         </div>
                     </div>
@@ -358,6 +392,8 @@
                 <div
                     ref="fileTreeElement"
                     class="file-tree"
+                    @dragover="handleExternalRootDragOver"
+                    @drop="handleExternalRootDrop"
                 >
                     <div
                         v-if="loadingTree"
@@ -417,6 +453,7 @@
                         $event,
                         getWikiRootDropTarget(),
                     )"
+                    @dragleave="handleTreeExternalDragLeave"
                     @drop="handleTreeDrop(
                         $event,
                         getWikiRootDropTarget(),
@@ -1271,6 +1308,8 @@
             <div
                 v-else
                 class="wiki-folder-view"
+                @dragover="handleExternalFolderViewDragOver"
+                @drop="handleExternalFolderViewDrop"
             >
                 <div class="folder-view-toolbar">
                     <div class="document-breadcrumbs">
@@ -2552,6 +2591,10 @@
 
     const createError = ref('')
     const createMenuVisible = ref(false)
+
+    const uploadFileInput = ref(null)
+    const uploadFolderInput = ref(null)
+    const uploadingResources = ref(false)
 
     /*
      * Create dialog state.
@@ -4244,6 +4287,258 @@
 
 
     /*
+     * Upload files and folders from the local computer.
+     * The same helpers are used by the + menu and external drag & drop.
+     */
+    function getUploadDestinationFolder(preferredPath = '') {
+        const root = normalizePath(wikiRoot.value)
+        const preferred = normalizePath(preferredPath)
+        const current = normalizePath(currentFolder.value)
+
+        if (preferred && isInsideWikiRoot(preferred)) {
+            return preferred
+        }
+
+        if (current && isInsideWikiRoot(current)) {
+            return current
+        }
+
+        return root
+    }
+
+    function openUploadFilePicker() {
+        closeCreateMenu()
+        createError.value = ''
+        if (!wikiRoot.value || uploadingResources.value) return
+        uploadFileInput.value?.click()
+    }
+
+    function openUploadFolderPicker() {
+        closeCreateMenu()
+        createError.value = ''
+        if (!wikiRoot.value || uploadingResources.value) return
+        uploadFolderInput.value?.click()
+    }
+
+    function splitRelativeUploadPath(path) {
+        return String(path || '')
+            .replace(/\\/g, '/')
+            .split('/')
+            .map((part) => part.trim())
+            .filter((part) => part && part !== '.' && part !== '..')
+    }
+
+    async function createUploadedDirectory(path) {
+        try {
+            await webDavRequest('MKCOL', path)
+        } catch (err) {
+            // 405 means the collection already exists. Existing folders are
+            // safe to reuse while recreating a selected directory structure.
+            if (err?.status !== 405) throw err
+        }
+    }
+
+    async function ensureUploadDirectories(baseFolder, relativeParts) {
+        let path = normalizePath(baseFolder)
+
+        for (const part of relativeParts) {
+            path = normalizePath(path + '/' + part)
+            await createUploadedDirectory(path)
+        }
+
+        return path
+    }
+
+    async function uploadLocalFile(file, destinationPath) {
+        try {
+            await webDavRequest('PUT', destinationPath, {
+                headers: {
+                    'Content-Type': file.type || 'application/octet-stream',
+                    'If-None-Match': '*',
+                },
+                body: file,
+            })
+        } catch (err) {
+            if (err?.status === 412 || err?.status === 409) {
+                throw new Error(`A file named "${getNameFromPath(destinationPath)}" already exists.`)
+            }
+            throw err
+        }
+    }
+
+    async function uploadFileEntries(entries, destinationFolder) {
+        if (!entries.length || uploadingResources.value) return
+
+        uploadingResources.value = true
+        let uploadedFiles = 0
+
+        try {
+            for (const entry of entries) {
+                const parts = splitRelativeUploadPath(entry.relativePath || entry.file.name)
+                if (!parts.length) continue
+
+                const fileName = parts.pop()
+                const parent = await ensureUploadDirectories(destinationFolder, parts)
+                await uploadLocalFile(entry.file, normalizePath(parent + '/' + fileName))
+                uploadedFiles++
+            }
+
+            currentFolder.value = normalizePath(destinationFolder)
+            await refreshAfterContextMutation(true)
+
+            const destinationNode = findNode(tree.value, normalizePath(destinationFolder))
+            if (destinationNode?.type === 'folder') {
+                await loadFolderChildren(destinationNode, true)
+                const next = new Set(expandedFolders.value)
+                next.add(normalizePath(destinationFolder))
+                expandedFolders.value = next
+            }
+
+            showOperationMessage(
+                uploadedFiles === 1
+                    ? '1 file uploaded.'
+                    : `${uploadedFiles} files uploaded.`,
+                'success',
+            )
+        } catch (err) {
+            showOperationMessage(err.message || 'Failed to upload files.', 'error')
+        } finally {
+            uploadingResources.value = false
+        }
+    }
+
+    async function handleUploadFileSelection(event) {
+        const files = Array.from(event.target?.files || [])
+        if (event.target) event.target.value = ''
+        const destination = getUploadDestinationFolder()
+        if (!destination || !files.length) return
+
+        await uploadFileEntries(
+            files.map((file) => ({ file, relativePath: file.name })),
+            destination,
+        )
+    }
+
+    async function handleUploadFolderSelection(event) {
+        const files = Array.from(event.target?.files || [])
+        if (event.target) event.target.value = ''
+        const destination = getUploadDestinationFolder()
+        if (!destination || !files.length) return
+
+        await uploadFileEntries(
+            files.map((file) => ({
+                file,
+                relativePath: file.webkitRelativePath || file.name,
+            })),
+            destination,
+        )
+    }
+
+    function isExternalFileDrag(event) {
+        if (treeDragSource.value) return false
+        const types = Array.from(event.dataTransfer?.types || [])
+        return types.includes('Files')
+    }
+
+    function readFileSystemFile(entry) {
+        return new Promise((resolve, reject) => entry.file(resolve, reject))
+    }
+
+    function readDirectoryEntries(reader) {
+        return new Promise((resolve, reject) => {
+            const all = []
+            const readBatch = () => {
+                reader.readEntries((entries) => {
+                    if (!entries.length) {
+                        resolve(all)
+                        return
+                    }
+                    all.push(...entries)
+                    readBatch()
+                }, reject)
+            }
+            readBatch()
+        })
+    }
+
+    async function collectDroppedEntry(entry, prefix = '') {
+        if (!entry) return []
+        const relativePath = prefix ? `${prefix}/${entry.name}` : entry.name
+
+        if (entry.isFile) {
+            const file = await readFileSystemFile(entry)
+            return [{ file, relativePath }]
+        }
+
+        if (entry.isDirectory) {
+            const children = await readDirectoryEntries(entry.createReader())
+            const result = []
+            for (const child of children) {
+                result.push(...await collectDroppedEntry(child, relativePath))
+            }
+            return result
+        }
+
+        return []
+    }
+
+    async function getExternalDropEntries(dataTransfer) {
+        const items = Array.from(dataTransfer?.items || [])
+        const entries = []
+
+        if (items.length && items.some((item) => typeof item.webkitGetAsEntry === 'function')) {
+            for (const item of items) {
+                const entry = item.webkitGetAsEntry?.()
+                if (entry) entries.push(...await collectDroppedEntry(entry))
+            }
+            if (entries.length) return entries
+        }
+
+        return Array.from(dataTransfer?.files || []).map((file) => ({
+            file,
+            relativePath: file.webkitRelativePath || file.name,
+        }))
+    }
+
+    async function handleExternalDrop(event, preferredDestination = '') {
+        if (!isExternalFileDrag(event)) return false
+        event.preventDefault()
+        event.stopPropagation()
+
+        const destination = getUploadDestinationFolder(preferredDestination)
+        if (!destination) return true
+
+        try {
+            const entries = await getExternalDropEntries(event.dataTransfer)
+            await uploadFileEntries(entries, destination)
+        } catch (err) {
+            showOperationMessage(err.message || 'Failed to read dropped files.', 'error')
+        }
+
+        return true
+    }
+
+    function handleExternalRootDragOver(event) {
+        if (!isExternalFileDrag(event)) return
+        event.preventDefault()
+        if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy'
+    }
+
+    async function handleExternalRootDrop(event) {
+        await handleExternalDrop(event, wikiRoot.value)
+    }
+
+    function handleExternalFolderViewDragOver(event) {
+        if (!isExternalFileDrag(event)) return
+        event.preventDefault()
+        if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy'
+    }
+
+    async function handleExternalFolderViewDrop(event) {
+        await handleExternalDrop(event, currentFolder.value || wikiRoot.value)
+    }
+
+    /*
      * Drag and drop in the main file tree.
      * Files and folders can be dragged, while only folders are
      * accepted as destinations. Closed folders auto-expand after
@@ -4424,6 +4719,40 @@
     }
 
     function handleTreeDragOver(event, target) {
+        if (isExternalFileDrag(event)) {
+            const destinationTarget = getTreeDropDestinationTarget(target)
+            if (!destinationTarget) return
+
+            event.preventDefault()
+            event.stopPropagation()
+
+            const targetPath = normalizePath(destinationTarget.path)
+
+            if (treeDropTargetPath.value !== targetPath) {
+                clearTreeDragExpandTimeout()
+            }
+
+            // Reuse the same drop-target state and visual feedback used
+            // by internal MOVE operations.
+            treeDropTargetPath.value = targetPath
+            treeDropTargetValid.value = true
+
+            if (event.dataTransfer) {
+                event.dataTransfer.dropEffect = 'copy'
+            }
+
+            if (
+                target?.type === 'folder' &&
+                !destinationTarget.isWikiRootDropTarget
+            ) {
+                scheduleTreeDragExpand(destinationTarget)
+            } else {
+                clearTreeDragExpandTimeout()
+            }
+
+            return
+        }
+
         const source =
             treeDragSource.value
 
@@ -4487,6 +4816,23 @@
         }
     }
 
+    function handleTreeExternalDragLeave(event) {
+        if (!isExternalFileDrag(event)) return
+
+        // dragleave also fires while moving between descendants of the tree.
+        // Only clear the highlight when the pointer actually leaves the
+        // complete tree area.
+        const nextElement = event.relatedTarget
+        if (
+            nextElement instanceof Node &&
+            event.currentTarget?.contains(nextElement)
+        ) {
+            return
+        }
+
+        resetTreeDragState()
+    }
+
     function getMovedSelectionPath(selectedPath, sourcePath, destination) {
         const selected = normalizePath(selectedPath)
         const source = normalizePath(sourcePath)
@@ -4502,6 +4848,17 @@
     }
 
     async function handleTreeDrop(event, target) {
+        if (isExternalFileDrag(event)) {
+            const destinationTarget = getTreeDropDestinationTarget(target)
+            const destinationPath = destinationTarget?.path || wikiRoot.value
+
+            // Remove the visual target immediately after the drop, while
+            // keeping the resolved destination for the asynchronous upload.
+            resetTreeDragState()
+            await handleExternalDrop(event, destinationPath)
+            return
+        }
+
         const source =
             treeDragSource.value
 
