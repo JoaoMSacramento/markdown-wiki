@@ -1,14 +1,33 @@
 <?xml version="1.0"?>
-<info>
+<info xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:noNamespaceSchemaLocation="https://apps.nextcloud.com/schema/apps/info.xsd">
     <id>markdown_wiki</id>
     <name>Markdown Wiki</name>
-    <summary>A Markdown-based wiki for Nextcloud</summary>
-    <description>A Markdown-based wiki integrated with Nextcloud Files.</description>
+
+    <summary>Turn your Markdown files into a powerful wiki inside Nextcloud</summary>
+
+    <description>
+        Markdown Wiki transforms your Markdown files into an organized and easy-to-navigate wiki directly inside Nextcloud.
+
+        Browse your Markdown files through a folder-based navigation tree, edit pages directly in the app, navigate between documents using breadcrumbs and previous/next controls, and quickly find content with full-text search.
+
+        Markdown Wiki also provides automatic table of contents generation, Mermaid diagram support, and seamless integration with Nextcloud Files and its light and dark themes.
+
+        Your wiki remains based on standard Markdown files stored in Nextcloud, keeping your content portable and accessible without locking it into a proprietary format.
+    </description>
+
     <version>0.1.0</version>
-    <licence>agpl</licence>
+    <licence>AGPL-3.0-or-later</licence>
+
     <author mail="jlmsacramento@gmail.com">João Sacramento</author>
+
     <namespace>MarkdownWiki</namespace>
     <category>tools</category>
+
+    <website>https://github.com/JoaoMSacramento/markdown-wiki</website>
+    <bugs>https://github.com/JoaoMSacramento/markdown-wiki/issues</bugs>
+    <repository>https://github.com/JoaoMSacramento/markdown-wiki</repository>
+
     <dependencies>
         <nextcloud min-version="31" max-version="34"/>
     </dependencies>
@@ -19,5 +38,5 @@
             <route>markdown_wiki.page.index</route>
             <order>10</order>
         </navigation>
-    </navigations>    
+    </navigations>
 </info>

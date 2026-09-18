@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+SPDX-FileCopyrightText: 2026 João Sacramento <jlmsacramento@gmail.com>
+SPDX-License-Identifier: AGPL-3.0-or-later
+-->
+<svg
+	xmlns="http://www.w3.org/2000/svg"
+	viewBox="0 0 64 64"
+	width="64"
+	height="64"
+	fill="none"
+	stroke="#ffffff"
+	stroke-linecap="round"
+	stroke-linejoin="round"
+>
+	<!-- Open book -->
+	<path
+		d="M2.5 9
+		   C12 6.5 23 8 32 15
+		   C41 8 52 6.5 61.5 9
+		   V52
+		   C51 49.5 41 51 32 58
+		   C23 51 13 49.5 2.5 52
+		   Z"
+		stroke-width="5"
+	/>
+
+	<!-- Centre fold -->
+	<path
+		d="M32 15 V58"
+		stroke-width="4"
+	/>
+
+	<!-- Markdown M -->
+	<path
+		d="M9 40 V22
+		   L16 30
+		   L23 22
+		   V40"
+		stroke-width="5"
+	/>
+
+	<!-- Markdown down arrow -->
+	<path
+		d="M44 21 V37
+		   M37.5 31 L44 38 L50.5 31"
+		stroke-width="5"
+	/>
+</svg>
