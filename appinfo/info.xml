@@ -6,15 +6,30 @@
 
     <summary>Turn your Markdown files into a powerful wiki inside Nextcloud</summary>
 
-    <description>
-        Markdown Wiki transforms your Markdown files into an organized and easy-to-navigate wiki directly inside Nextcloud.
+    <description><![CDATA[
+Turn your Markdown files into an organized and easy-to-navigate wiki directly inside Nextcloud.
 
-        Browse your Markdown files through a folder-based navigation tree, edit pages directly in the app, navigate between documents using breadcrumbs and previous/next controls, and quickly find content with full-text search.
+## Features
 
-        Markdown Wiki also provides automatic table of contents generation, Mermaid diagram support, and seamless integration with Nextcloud Files and its light and dark themes.
+- **Folder-based navigation** — Browse your wiki through a familiar folder tree.
+- **Built-in Markdown editor** — Read, edit and preview Markdown without leaving Nextcloud.
+- **Full-text search** — Quickly find content across your Markdown files.
+- **Breadcrumb navigation** — Always know where you are in your wiki.
+- **Automatic table of contents** — Navigate headings within long documents.
+- **Internal Markdown links** — Follow relative links between pages while staying inside Markdown Wiki.
+- **Mermaid diagrams** — Render flowcharts, sequence diagrams and other Mermaid diagrams directly in your pages.
+- **Syntax highlighting** — Display code blocks with language-aware highlighting.
+- **File management** — Create, rename, move and delete files and folders directly from the wiki.
+- **Drag and drop** — Organize files and folders using drag-and-drop.
+- **Markdown and All Files views** — Focus on Markdown or browse all files in your Wiki Root.
+- **Light and dark themes** — Integrates with your Nextcloud theme.
 
-        Your wiki remains based on standard Markdown files stored in Nextcloud, keeping your content portable and accessible without locking it into a proprietary format.
-    </description>
+## Your files, your wiki
+
+Markdown Wiki works directly with standard `.md` files stored in Nextcloud. Your content remains portable and accessible without being locked into a proprietary format.
+
+Choose a folder as your **Wiki Root** and Markdown Wiki turns its contents into your personal wiki while keeping the underlying files fully accessible through Nextcloud Files.
+]]></description>
 
     <version>0.1.0</version>
     <licence>AGPL-3.0-or-later</licence>
@@ -27,6 +42,13 @@
     <website>https://github.com/JoaoMSacramento/markdown-wiki</website>
     <bugs>https://github.com/JoaoMSacramento/markdown-wiki/issues</bugs>
     <repository>https://github.com/JoaoMSacramento/markdown-wiki</repository>
+
+    <screenshot>https://raw.githubusercontent.com/JoaoMSacramento/markdown-wiki/main/screenshots/markdown-wiki-main.png</screenshot>
+    <screenshot>https://raw.githubusercontent.com/JoaoMSacramento/markdown-wiki/main/screenshots/markdown-wiki-editor.png</screenshot>
+    <screenshot>https://raw.githubusercontent.com/JoaoMSacramento/markdown-wiki/main/screenshots/markdown-wiki-file-manager.png</screenshot>
+    <screenshot>https://raw.githubusercontent.com/JoaoMSacramento/markdown-wiki/main/screenshots/markdown-wiki-search.png</screenshot>
+    <screenshot>https://raw.githubusercontent.com/JoaoMSacramento/markdown-wiki/main/screenshots/markdown-wiki-mermaid.png</screenshot>
+    <screenshot>https://raw.githubusercontent.com/JoaoMSacramento/markdown-wiki/main/screenshots/markdown-wiki-code.png</screenshot>
 
     <dependencies>
         <nextcloud min-version="31" max-version="34"/>

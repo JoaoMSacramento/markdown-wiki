@@ -4,6 +4,7 @@ version = 1
 path = [
     ".gitignore",
     "README.md",
+    "screenshots/*.png",
     "appinfo/info.xml",
     "js/markdown_wiki.js",
     "package.json",
