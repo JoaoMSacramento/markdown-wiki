@@ -31,7 +31,7 @@ Markdown Wiki works directly with standard `.md` files stored in Nextcloud. Your
 Choose a folder as your **Wiki Root** and Markdown Wiki turns its contents into your personal wiki while keeping the underlying files fully accessible through Nextcloud Files.
 ]]></description>
 
-    <version>0.1.0</version>
+    <version>0.1.1</version>
     <licence>AGPL-3.0-or-later</licence>
 
     <author mail="jlmsacramento@gmail.com">João Sacramento</author>
