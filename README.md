@@ -1,6 +1,6 @@
 # Welcome Native Wiki
 
-> **Native Wiki** is a maintained fork of [Markdown Wiki](https://github.com/JoaoMSacramento/markdown-wiki) by João Sacramento, continued and maintained by Diego Romero.
+> **Native Wiki** is a maintained fork of [Markdown Wiki](https://github.com/JoaoMSacramento/markdown-wiki) by João Sacramento.
 
 Native Wiki is a Nextcloud application that turns your Markdown files into an organized and easy-to-navigate wiki directly inside Nextcloud.
 
