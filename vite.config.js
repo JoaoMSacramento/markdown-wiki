@@ -10,7 +10,7 @@ export default defineConfig({
     plugins: [vue()],
 
     define: {
-        appName: JSON.stringify('markdown_wiki'),
+        appName: JSON.stringify('native_wiki'),
         appVersion: JSON.stringify('0.1.0'),
     },
 
@@ -24,8 +24,8 @@ export default defineConfig({
             output: {
                 format: 'iife',
                 inlineDynamicImports: true,
-                entryFileNames: 'markdown_wiki.js',
-                assetFileNames: 'markdown_wiki.[ext]',
+                entryFileNames: 'native_wiki.js',
+                assetFileNames: 'native_wiki.[ext]',
             },
         },
     },

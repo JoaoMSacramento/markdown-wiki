@@ -5,6 +5,6 @@
 
 import { createApp } from 'vue';
 import App from './App.vue';
-import '../css/markdown_wiki.css'
+import '../css/native_wiki.css'
 
-createApp(App).mount('#markdown-wiki-app');
+createApp(App).mount('#native-wiki-app');

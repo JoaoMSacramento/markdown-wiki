@@ -1,10 +1,11 @@
 <!--
+SPDX-FileCopyrightText: 2026 João Sacramento <jlmsacramento@gmail.com>
 SPDX-FileCopyrightText: 2026 Diego Romero <diegmero12@gmail.com>
 SPDX-License-Identifier: AGPL-3.0-or-later
 -->
 
 <template>
-    <div class="markdown-wiki">
+    <div class="native-wiki">
         <Teleport to="body">
             <Transition name="wiki-operation-message">
                 <div
@@ -2723,7 +2724,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later
     const fileTreeElement = ref(null)
 
     const searchHistoryStorageKey =
-        'markdown_wiki_search_history'
+        'native_wiki_search_history'
 
     const maxSearchHistory = 10
 
@@ -2956,7 +2957,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later
     async function fetchFolder(path) {
         const url = new URL(
             OC.generateUrl(
-                '/apps/markdown_wiki/api/files',
+                '/apps/native_wiki/api/files',
             ),
             window.location.origin,
         )
@@ -6530,8 +6531,8 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 
             const endpoint =
                 isFolder
-                    ? '/apps/markdown_wiki/api/create-folder'
-                    : '/apps/markdown_wiki/api/create-file'
+                    ? '/apps/native_wiki/api/create-folder'
+                    : '/apps/native_wiki/api/create-file'
 
             const response = await fetch(
                 OC.generateUrl(endpoint),
@@ -6887,7 +6888,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later
         try {
             const url = new URL(
                 OC.generateUrl(
-                    '/apps/markdown_wiki/api/search',
+                    '/apps/native_wiki/api/search',
                 ),
                 window.location.origin,
             )
@@ -7377,7 +7378,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later
         try {
             const url = new URL(
                 OC.generateUrl(
-                    '/apps/markdown_wiki/api/file',
+                    '/apps/native_wiki/api/file',
                 ),
                 window.location.origin,
             )
@@ -8342,7 +8343,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 
             const response = await fetch(
                 OC.generateUrl(
-                    '/apps/markdown_wiki/api/save-file',
+                    '/apps/native_wiki/api/save-file',
                 ),
                 {
                     method: 'POST',
@@ -9147,10 +9148,10 @@ SPDX-License-Identifier: AGPL-3.0-or-later
     function isDarkNextcloudTheme() {
         const target =
             document.querySelector(
-                '#markdown-wiki-app .markdown-wiki',
+                '#native-wiki-app .native-wiki',
             ) ||
             document.querySelector(
-                '#markdown-wiki-app',
+                '#native-wiki-app',
             ) ||
             document.body
 
@@ -9200,7 +9201,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 
         const containers =
             document.querySelectorAll(
-                '#markdown-wiki-app .mermaid-diagram[data-mermaid-source]',
+                '#native-wiki-app .mermaid-diagram[data-mermaid-source]',
             )
 
         if (!containers.length) {
@@ -9304,7 +9305,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 
             try {
                 const id =
-                    `markdown-wiki-mermaid-${generation}-${index++}`
+                    `native-wiki-mermaid-${generation}-${index++}`
 
                 const { svg } =
                     await mermaid.render(
@@ -9566,7 +9567,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 
             const response = await fetch(
                 OC.generateUrl(
-                    '/apps/markdown_wiki/api/wiki-root',
+                    '/apps/native_wiki/api/wiki-root',
                 ),
                 {
                     method: 'POST',
@@ -9629,7 +9630,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later
         try {
             const response = await fetch(
                 OC.generateUrl(
-                    '/apps/markdown_wiki/api/wiki-root',
+                    '/apps/native_wiki/api/wiki-root',
                 ),
                 {
                     method: 'GET',

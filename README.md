@@ -70,16 +70,16 @@ Native Wiki can be installed directly from the Nextcloud App Store.
 
 ### Manual installation
 
-Download a release of Markdown Wiki and extract it into your Nextcloud `apps` or `custom_apps` directory so that the application is located at:
+Download a release of Native Wiki and extract it into your Nextcloud `apps` or `custom_apps` directory so that the application is located at:
 
 ```text
-apps/markdown_wiki
+apps/native_wiki
 ```
 
 Then enable the application from the Nextcloud Apps page or with:
 
 ```bash
-php occ app:enable markdown_wiki
+php occ app:enable native_wiki
 ```
 
 ## Development
