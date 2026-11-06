@@ -1,10 +1,12 @@
-# Markdown Wiki
+# Welcome Native Wiki
 
-Markdown Wiki is a Nextcloud application that turns your Markdown files into an organized and easy-to-navigate wiki directly inside Nextcloud.
+> **Native Wiki** is a maintained fork of [Markdown Wiki](https://github.com/JoaoMSacramento/markdown-wiki) by João Sacramento, continued and maintained by Diego Romero.
+
+Native Wiki is a Nextcloud application that turns your Markdown files into an organized and easy-to-navigate wiki directly inside Nextcloud.
 
 Your content remains stored as standard Markdown files, keeping it portable and accessible without locking it into a proprietary format.
 
-![Markdown Wiki](screenshots/markdown-wiki-main.png)
+![Native Wiki](screenshots/markdown-wiki-main.png)
 
 ## Features
 
@@ -53,18 +55,18 @@ The underlying files remain regular `.md` files in Nextcloud, so they can still 
 
 ## Requirements
 
-- Nextcloud 31–34
+- Nextcloud 31–35
 
 ## Installation
 
 ### Nextcloud App Store
 
-Markdown Wiki can be installed directly from the Nextcloud App Store.
+Native Wiki can be installed directly from the Nextcloud App Store.
 
 1. Open **Apps** in your Nextcloud instance.
-2. Search for **Markdown Wiki**.
+2. Search for **Native Wiki**.
 3. Install and enable the app.
-4. Open Markdown Wiki and choose a folder as your **Wiki Root**.
+4. Open Native Wiki and choose a folder as your **Wiki Root**.
 
 ### Manual installation
 
@@ -102,7 +104,7 @@ npm run dev
 
 ## Compatibility
 
-Markdown Wiki currently supports:
+Native Wiki currently supports:
 
 | Nextcloud | Supported |
 | --- | --- |
@@ -110,6 +112,7 @@ Markdown Wiki currently supports:
 | 32 | Yes |
 | 33 | Yes |
 | 34 | Yes |
+| 35 | Yes |
 
 ## Reporting issues
 
@@ -117,6 +120,6 @@ Found a bug or have a feature request? Please open an issue in the GitHub issue 
 
 ## License
 
-Markdown Wiki is licensed under the GNU Affero General Public License v3.0 or later (`AGPL-3.0-or-later`).
+Native Wiki is licensed under the GNU Affero General Public License v3.0 or later (`AGPL-3.0-or-later`), the same license as the upstream project.
 
 See [`LICENSES/AGPL-3.0-or-later.txt`](LICENSES/AGPL-3.0-or-later.txt) for the full license text.
