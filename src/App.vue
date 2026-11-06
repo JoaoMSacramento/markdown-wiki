@@ -8604,11 +8604,9 @@ SPDX-License-Identifier: AGPL-3.0-or-later
                 .join('/')
 
         return (
-            OC.generateUrl(
-                '/remote.php/dav/files/' +
-                    encodeURIComponent(
-                        OC.currentUser,
-                    ),
+            OC.linkToRemote(
+                'dav/files/' +
+                    encodeURIComponent(OC.currentUser),
             ) +
             '/' +
             encodedPath
