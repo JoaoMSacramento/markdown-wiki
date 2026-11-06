@@ -1,5 +1,5 @@
 <!--
-SPDX-FileCopyrightText: 2026 João Sacramento <jlmsacramento@gmail.com>
+SPDX-FileCopyrightText: 2026 Diego Romero <diegmero12@gmail.com>
 SPDX-License-Identifier: AGPL-3.0-or-later
 -->
 
@@ -38,7 +38,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 
         <aside class="wiki-sidebar">
             <div class="sidebar-header">
-                <h1>Markdown Wiki</h1>
+                <h1>Native Wiki</h1>
             </div>
 
             <div
@@ -498,7 +498,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 
                     <p>
                         Choose a folder from your Nextcloud Files
-                        to use as the root of your Markdown Wiki.
+                        to use as the root of your Native Wiki.
                     </p>
 
                     <button
