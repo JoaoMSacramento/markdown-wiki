@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <info xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
       xsi:noNamespaceSchemaLocation="https://apps.nextcloud.com/schema/apps/info.xsd">
-    <id>markdown_wiki</id>
-    <name>Markdown Wiki</name>
+    <id>native_wiki</id>
+    <name>Native Wiki</name>
 
     <summary>Turn your Markdown files into a powerful wiki inside Nextcloud</summary>
 
@@ -16,7 +16,7 @@ Turn your Markdown files into an organized and easy-to-navigate wiki directly in
 - **Full-text search** — Quickly find content across your Markdown files.
 - **Breadcrumb navigation** — Always know where you are in your wiki.
 - **Automatic table of contents** — Navigate headings within long documents.
-- **Internal Markdown links** — Follow relative links between pages while staying inside Markdown Wiki.
+- **Internal Markdown links** — Follow relative links between pages while staying inside Native Wiki.
 - **Mermaid diagrams** — Render flowcharts, sequence diagrams and other Mermaid diagrams directly in your pages.
 - **Syntax highlighting** — Display code blocks with language-aware highlighting.
 - **File management** — Create, rename, move and delete files and folders directly from the wiki.
@@ -26,31 +26,32 @@ Turn your Markdown files into an organized and easy-to-navigate wiki directly in
 
 ## Your files, your wiki
 
-Markdown Wiki works directly with standard `.md` files stored in Nextcloud. Your content remains portable and accessible without being locked into a proprietary format.
+Native Wiki works directly with standard `.md` files stored in Nextcloud. Your content remains portable and accessible without being locked into a proprietary format.
 
-Choose a folder as your **Wiki Root** and Markdown Wiki turns its contents into your personal wiki while keeping the underlying files fully accessible through Nextcloud Files.
+Choose a folder as your **Wiki Root** and Native Wiki turns its contents into your personal wiki while keeping the underlying files fully accessible through Nextcloud Files.
 ]]></description>
 
-    <version>0.1.2</version>
+    <version>0.1.0</version>
     <licence>AGPL-3.0-or-later</licence>
 
-    <author mail="jlmsacramento@gmail.com">João Sacramento</author>
+    <author mail="diegmero12@gmail.com">Diego Romero</author>
 
-    <namespace>MarkdownWiki</namespace>
+    <namespace>NativeWiki</namespace>
     <category>tools</category>
     <category>office</category>
     <category>files</category>
+    <category>text</category>
 
-    <website>https://github.com/JoaoMSacramento/markdown-wiki</website>
-    <bugs>https://github.com/JoaoMSacramento/markdown-wiki/issues</bugs>
-    <repository>https://github.com/JoaoMSacramento/markdown-wiki</repository>
+    <website>https://github.com/diegmero/native-wiki</website>
+    <bugs>https://github.com/diegmero/native-wiki/issues</bugs>
+    <repository>https://github.com/diegmero/native-wiki</repository>
 
-    <screenshot>https://raw.githubusercontent.com/JoaoMSacramento/markdown-wiki/main/screenshots/markdown-wiki-main.png</screenshot>
-    <screenshot>https://raw.githubusercontent.com/JoaoMSacramento/markdown-wiki/main/screenshots/markdown-wiki-editor.png</screenshot>
-    <screenshot>https://raw.githubusercontent.com/JoaoMSacramento/markdown-wiki/main/screenshots/markdown-wiki-file-manager.png</screenshot>
-    <screenshot>https://raw.githubusercontent.com/JoaoMSacramento/markdown-wiki/main/screenshots/markdown-wiki-search.png</screenshot>
-    <screenshot>https://raw.githubusercontent.com/JoaoMSacramento/markdown-wiki/main/screenshots/markdown-wiki-mermaid.png</screenshot>
-    <screenshot>https://raw.githubusercontent.com/JoaoMSacramento/markdown-wiki/main/screenshots/markdown-wiki-code.png</screenshot>
+    <screenshot>https://raw.githubusercontent.com/diegmero/native-wiki/main/screenshots/markdown-wiki-main.png</screenshot>
+    <screenshot>https://raw.githubusercontent.com/diegmero/native-wiki/main/screenshots/markdown-wiki-editor.png</screenshot>
+    <screenshot>https://raw.githubusercontent.com/diegmero/native-wiki/main/screenshots/markdown-wiki-file-manager.png</screenshot>
+    <screenshot>https://raw.githubusercontent.com/diegmero/native-wiki/main/screenshots/markdown-wiki-search.png</screenshot>
+    <screenshot>https://raw.githubusercontent.com/diegmero/native-wiki/main/screenshots/markdown-wiki-mermaid.png</screenshot>
+    <screenshot>https://raw.githubusercontent.com/diegmero/native-wiki/main/screenshots/markdown-wiki-code.png</screenshot>
 
     <dependencies>
         <nextcloud min-version="31" max-version="35"/>
@@ -58,8 +59,8 @@ Choose a folder as your **Wiki Root** and Markdown Wiki turns its contents into 
 
     <navigations>
         <navigation>
-            <name>Markdown Wiki</name>
-            <route>markdown_wiki.page.index</route>
+            <name>Native Wiki</name>
+            <route>native_wiki.page.index</route>
             <order>10</order>
         </navigation>
     </navigations>
