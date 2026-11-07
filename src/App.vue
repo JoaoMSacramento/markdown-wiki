@@ -5,7 +5,13 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 -->
 
 <template>
-    <div class="native-wiki">
+    <div
+        class="native-wiki"
+        :class="{
+            'native-wiki--dark': isDarkTheme,
+            'native-wiki--light': !isDarkTheme,
+        }"
+    >
         <Teleport to="body">
             <Transition name="wiki-operation-message">
                 <div
@@ -447,7 +453,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later
                                     'var(--border-radius-element)',
                                 outline: treeDropTargetValid
                                     ? '2px solid var(--color-primary-element)'
-                                    : '2px solid var(--color-error)',
+                                    : '2px solid var(--color-element-error)',
                                 outlineOffset: '-2px',
                                 background: treeDropTargetValid
                                     ? 'var(--color-primary-element-light)'
@@ -9145,6 +9151,13 @@ SPDX-License-Identifier: AGPL-3.0-or-later
         )
     }
 
+    const isDarkTheme = ref(false)
+
+    function updateThemeState() {
+        isDarkTheme.value =
+            isDarkNextcloudTheme()
+    }
+
     function isDarkNextcloudTheme() {
         const target =
             document.querySelector(
@@ -10274,7 +10287,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later
                                     outline:
                                         props.dropTargetValid
                                             ? '2px solid var(--color-primary-element)'
-                                            : '2px solid var(--color-error)',
+                                            : '2px solid var(--color-element-error)',
                                     outlineOffset:
                                         '-2px',
                                     background:
@@ -10803,9 +10816,11 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 
     onMounted(() => {
         loadSearchHistory()
+        updateThemeState()
 
         mermaidThemeObserver =
             new MutationObserver(() => {
+                updateThemeState()
                 renderMermaidDiagrams()
             })
 
