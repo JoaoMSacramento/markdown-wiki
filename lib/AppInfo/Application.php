@@ -7,13 +7,13 @@
 
 declare(strict_types=1);
 
-namespace OCA\MarkdownWiki\AppInfo;
+namespace OCA\NativeWiki\AppInfo;
 
 use OCP\AppFramework\App;
 
 class Application extends App
 {
-    public const APP_ID = 'markdown_wiki';
+    public const APP_ID = 'native_wiki';
 
     public function __construct()
     {

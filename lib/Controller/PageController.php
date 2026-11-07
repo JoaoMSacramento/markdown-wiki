@@ -2,12 +2,13 @@
 
 /**
  * SPDX-FileCopyrightText: 2026 João Sacramento <jlmsacramento@gmail.com>
+ * SPDX-FileCopyrightText: 2026 Diego Romero <diegmero12@gmail.com>
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
 declare(strict_types=1);
 
-namespace OCA\MarkdownWiki\Controller;
+namespace OCA\NativeWiki\Controller;
 
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
@@ -29,7 +30,7 @@ class PageController extends Controller
     #[NoAdminRequired]
     public function index(): TemplateResponse
     {
-        Util::addScript($this->appName, 'markdown_wiki');
+        Util::addScript($this->appName, 'native_wiki');
 
         return new TemplateResponse(
             $this->appName,

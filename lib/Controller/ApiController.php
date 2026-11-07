@@ -7,7 +7,7 @@
 
 declare(strict_types=1);
 
-namespace OCA\MarkdownWiki\Controller;
+namespace OCA\NativeWiki\Controller;
 
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
